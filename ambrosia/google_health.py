@@ -13,6 +13,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlencode, urlparse
+from zoneinfo import ZoneInfo
 
 import httpx
 import orjson
@@ -43,7 +44,7 @@ DATA_TYPES: dict[str, str] = {
     "active-energy-burned": "active_energy_burned.interval.start_time",
     "sedentary-period": "sedentary_period.interval.start_time",
     "time-in-heart-rate-zone": "time_in_heart_rate_zone.interval.start_time",
-    "exercise": "exercise.interval.start_time",
+    "exercise": "exercise.interval.civil_start_time",
     "heart-rate": "heart_rate.sample_time.physical_time",
     "heart-rate-variability": "heart_rate_variability.sample_time.physical_time",
     "oxygen-saturation": "oxygen_saturation.sample_time.physical_time",
@@ -185,10 +186,17 @@ def _retry_seconds(response: httpx.Response, attempt: int) -> float:
 
 
 class GoogleHealthClient:
-    def __init__(self, credentials_path: Path, token_path: Path, client: httpx.Client | None = None):
+    def __init__(
+        self,
+        credentials_path: Path,
+        token_path: Path,
+        client: httpx.Client | None = None,
+        timezone_name: str = "America/Los_Angeles",
+    ):
         self.credentials_path = credentials_path
         self.token_path = token_path
         self.client = client or httpx.Client(timeout=60)
+        self.timezone = ZoneInfo(timezone_name)
 
     def access_token(self, force_refresh: bool = False) -> str:
         token = _load_json(self.token_path)
@@ -250,6 +258,9 @@ class GoogleHealthClient:
         field = DATA_TYPES[data_type]
         if field.endswith(".date"):
             filter_value = f'{field} >= "{start.date().isoformat()}"'
+        elif ".civil_" in field:
+            civil_start = start.astimezone(self.timezone).replace(tzinfo=None)
+            filter_value = f'{field} >= "{civil_start.isoformat(timespec="seconds")}"'
         else:
             filter_value = f'{field} >= "{start.isoformat().replace("+00:00", "Z")}"'
         params: dict[str, Any] = {
@@ -296,7 +307,11 @@ class GoogleHealthSync:
             "INSERT INTO sync_runs VALUES (?, ?, NULL, 'running', ?, '{}')",
             [run_id, started, trigger],
         )
-        client = GoogleHealthClient(self.settings.google_credentials, self.settings.google_token)
+        client = GoogleHealthClient(
+            self.settings.google_credentials,
+            self.settings.google_token,
+            timezone_name=self.settings.timezone,
+        )
         run_dir = self.settings.raw_dir / started.strftime("%Y/%m/%d/%Y%m%dT%H%M%SZ")
         results: dict[str, Any] = {}
         for data_type in types:

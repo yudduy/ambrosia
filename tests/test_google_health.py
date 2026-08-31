@@ -104,9 +104,14 @@ def test_list_and_reconcile_modes_are_selected_by_type(tmp_path: Path):
     client.fetch("sleep", start)
     client.fetch("steps", start)
     client.fetch("nutrition-log", start)
+    client.fetch("exercise", start)
     assert calls[0][0].endswith("/sleep/dataPoints")
     assert calls[1][0].endswith("/steps/dataPoints:reconcile")
     assert calls[2][0].endswith("/nutrition-log/dataPoints")
+    assert calls[3][0].endswith("/exercise/dataPoints")
+    assert calls[3][1]["filter"] == (
+        'exercise.interval.civil_start_time >= "2026-08-28T17:00:00"'
+    )
 
 
 def test_partial_sync_advances_only_successful_watermark(monkeypatch, database, app_settings, tmp_path: Path):
@@ -117,7 +122,7 @@ def test_partial_sync_advances_only_successful_watermark(monkeypatch, database, 
     configured = app_settings.model_copy(update={"google_credentials": credentials, "google_token": token})
 
     class FakeClient:
-        def __init__(self, *_):
+        def __init__(self, *_, **__):
             pass
 
         def fetch(self, data_type: str, start: datetime):
