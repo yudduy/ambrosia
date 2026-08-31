@@ -64,6 +64,24 @@ async def _wait_for_turn(provider, thread_id: str, turn_id: str) -> tuple[str, b
             return str((params.get("turn") or {}).get("status")), mcp_called, text
 
 
+def _event_turn_id(event: dict) -> str | None:
+    params = event.get("params") or {}
+    return params.get("turnId") or (params.get("turn") or {}).get("id")
+
+
+async def _wait_for_turn_activity(provider, thread_id: str, turn_id: str, timeout: float = 30) -> bool:
+    stream = provider.events(thread_id)
+    while True:
+        event = await asyncio.wait_for(anext(stream), timeout=timeout)
+        if _event_turn_id(event) != turn_id:
+            continue
+        method = event.get("method")
+        if method == "turn/completed":
+            return False
+        if method in {"turn/started", "turn/updated", "item/started", "item/completed"}:
+            return True
+
+
 def _provider(name: str, app_settings: Settings):
     return OmpSidecarProvider(app_settings) if name == "omp" else CodexAppServerProvider(app_settings)
 
@@ -110,19 +128,38 @@ async def assistant_gate(app_settings: Settings, provider_name: str) -> dict:
         meal = await analyze_meal(provider, test_image, "synthetic chicken and greens bowl")
         checks["meal_schema"] = meal.calories.high >= meal.calories.low and 0 <= meal.confidence <= 1
 
-        interrupt_thread = await provider.create_thread()
-        interrupt_id = await provider.start_turn(
-            interrupt_thread, "Write a long, detailed review of every covered metric one by one."
+        interrupt_verified = False
+        interrupt_prompt = (
+            "Do not call tools. Keep writing 'still streaming <n>' on separate lines, starting at 1, "
+            "until you are interrupted. Do not summarize or stop early."
         )
-        await provider.interrupt_turn(interrupt_thread, interrupt_id)
-        interrupted_status, _, _ = await _wait_for_turn(provider, interrupt_thread, interrupt_id)
-        checks["interruption"] = interrupted_status in {"interrupted", "completed"}
+        for _ in range(2):
+            interrupt_thread = await provider.create_thread()
+            interrupt_id = await provider.start_turn(interrupt_thread, interrupt_prompt)
+            active = await _wait_for_turn_activity(provider, interrupt_thread, interrupt_id)
+            if not active:
+                continue
+            try:
+                await provider.interrupt_turn(interrupt_thread, interrupt_id)
+            except Exception as error:
+                if "no active turn to interrupt" not in str(error):
+                    raise
+            interrupted_status, _, _ = await _wait_for_turn(provider, interrupt_thread, interrupt_id)
+            checks["interruption"] = interrupted_status in {"interrupted", "completed"}
+            interrupt_verified = True
+            break
+        if not interrupt_verified:
+            gate_error = "Unable to observe an active turn before interruption."
 
         await provider.close()
         provider = _provider(provider_name, app_settings)
         restarted = await provider.status()
         await provider.resume_thread(thread_id)
-        checks["resume"] = restarted.authenticated
+        resumed_turn = await provider.start_turn(thread_id, "Reply with exactly: resume verified.")
+        resumed_status, _, resumed_text = await _wait_for_turn(provider, thread_id, resumed_turn)
+        checks["resume"] = restarted.authenticated and resumed_status == "completed" and (
+            resumed_text.strip().lower() == "resume verified."
+        )
     except Exception as error:
         gate_error = str(error)
     finally:
