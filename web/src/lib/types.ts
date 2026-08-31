@@ -44,6 +44,31 @@ export interface MetricSummary {
   coverage: Coverage;
 }
 
+export interface ReadinessComponent {
+  key: "sleep_duration" | "hrv" | "resting_hr";
+  label: string;
+  value: number;
+  unit: string;
+  score: number;
+  baseline_median: number;
+  baseline_days: number;
+}
+
+export interface ReadinessScore {
+  score: number | null;
+  label: "low" | "moderate" | "high" | "unavailable";
+  message: string;
+  components: ReadinessComponent[];
+  baseline_days: number;
+  method_version: string;
+}
+
+export interface DailyReadiness {
+  date: string;
+  score: number | null;
+  label: ReadinessScore["label"];
+}
+
 export interface WeeklyReport {
   week_start: string;
   generated_at: string;
@@ -61,6 +86,10 @@ export interface HomeResponse {
   provenance: Provenance;
   report: WeeklyReport | null;
   sync: Record<string, unknown>;
+  readiness: ReadinessScore;
+  readiness_history: DailyReadiness[];
+  today_metrics: MetricSummary[];
+  overnight_metrics: MetricSummary[];
 }
 
 export interface DomainResponse {
@@ -123,4 +152,3 @@ export interface Profile {
   weight_unit: "lb" | "kg";
   updated_at: string | null;
 }
-

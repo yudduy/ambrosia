@@ -35,7 +35,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  home: () => request<HomeResponse>("/api/home"),
+  home: (date?: string) => request<HomeResponse>(`/api/home${date ? `?date=${date}` : ""}`),
+  sync: () => request<Record<string, unknown>>("/api/sync", { method: "POST" }),
   reports: () => request<{ generated_at: string; reports: WeeklyReport[] }>("/api/reports?limit=12"),
   domain: (domain: Domain, range: RangeName) =>
     request<DomainResponse>(`/api/${domain}?range=${range}`),

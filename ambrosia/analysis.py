@@ -15,10 +15,13 @@ from .db import Database, json_value
 from .models import (
     Comparison,
     Coverage,
+    DailyReadiness,
     DomainResponse,
     HomeResponse,
     MetricSummary,
     Provenance,
+    ReadinessComponent,
+    ReadinessScore,
     RelationshipResult,
     SeriesPoint,
     SessionSummary,
@@ -29,6 +32,7 @@ from .models import (
 
 
 METHOD_VERSION = "personal-baseline-v1"
+READINESS_METHOD_VERSION = "personal-readiness-v1"
 RangeName = Literal["7d", "28d", "90d"]
 
 
@@ -107,6 +111,12 @@ def _period_value(values: list[float], aggregation: str) -> float | None:
     if aggregation == "mean":
         return float(sum(values) / len(values))
     return float(median(values))
+
+
+def _percentile_rank(value: float, values: list[float]) -> float:
+    lower = sum(item < value for item in values)
+    equal = sum(item == value for item in values)
+    return (lower + equal / 2) / len(values) * 100
 
 
 def _coverage(covered: int, expected: int, label: str = "days") -> Coverage:
@@ -279,13 +289,23 @@ class HealthAnalysis:
         end = as_of or datetime.now(self.settings.tz).date()
         keys = ("steps", "sleep_duration", "calories", "weight", "resting_hr", "hrv", "spo2")
         metrics = [self._metric_summary(key, end, 7) for key in keys]
+        today_metrics = [
+            self._metric_summary(key, end, 1)
+            for key in ("steps", "active_minutes", "zone_minutes", "workouts", "calories", "hydration")
+        ]
+        overnight_metrics = [
+            self._metric_summary(key, end, 1)
+            for key in ("sleep_duration", "resting_hr", "hrv", "spo2", "respiratory_rate")
+        ]
+        readiness = self._readiness(end)
         sentence = self._sentence(metrics)
         covered_days = len({point.date for metric in metrics for point in metric.series if point.covered})
         start = end - timedelta(days=6)
         report = self._weekly_report(end, sentence, metrics)
-        sync = self.db.row(
+        sync = dict(self.db.row(
             "SELECT started_at, finished_at, status, trigger, details FROM sync_runs ORDER BY started_at DESC LIMIT 1"
-        ) or {"status": "not_started"}
+        ) or {"status": "not_started"})
+        sync["configured"] = bool(self.settings.google_credentials and self.settings.google_token)
         return HomeResponse(
             generated_at=datetime.now(UTC),
             as_of=end,
@@ -297,6 +317,89 @@ class HealthAnalysis:
             ),
             report=report,
             sync=sync,
+            readiness=readiness,
+            readiness_history=[
+                DailyReadiness(date=day, score=result.score, label=result.label)
+                for day in (end - timedelta(days=offset) for offset in range(6, -1, -1))
+                for result in [self._readiness(day)]
+            ],
+            today_metrics=today_metrics,
+            overnight_metrics=overnight_metrics,
+        )
+
+    def _readiness(self, day: date) -> ReadinessScore:
+        specifications = (
+            ("sleep_duration", 0.4, False),
+            ("hrv", 0.3, False),
+            ("resting_hr", 0.3, True),
+        )
+        components: list[ReadinessComponent] = []
+        baseline_counts: list[int] = []
+        missing_signals: list[str] = []
+        needs_history = False
+        weighted_score = 0.0
+        for key, weight, lower_is_better in specifications:
+            definition = METRICS[key]
+            values = self._daily_values(definition, day - timedelta(days=180), day)
+            current = values.get(day)
+            baseline = [
+                value for _, value in sorted(
+                    ((candidate_day, value) for candidate_day, value in values.items() if candidate_day < day),
+                    reverse=True,
+                )[:28]
+            ]
+            baseline_counts.append(len(baseline))
+            if current is None:
+                missing_signals.append({
+                    "sleep_duration": "sleep", "hrv": "HRV", "resting_hr": "resting heart rate",
+                }[key])
+                continue
+            if len(baseline) < 14:
+                needs_history = True
+                continue
+            rank = _percentile_rank(current, baseline)
+            favorable_rank = 100 - rank if lower_is_better else rank
+            component_score = round(20 + favorable_rank * 0.8)
+            weighted_score += component_score * weight
+            components.append(
+                ReadinessComponent(
+                    key=key,
+                    label=definition.label,
+                    value=round(current, 2),
+                    unit=definition.unit.split("/")[0],
+                    score=component_score,
+                    baseline_median=round(float(median(baseline)), 2),
+                    baseline_days=len(baseline),
+                )
+            )
+        baseline_days = min(baseline_counts, default=0)
+        if len(components) != len(specifications):
+            if needs_history:
+                message = f"{max(0, 14 - baseline_days)} more baseline days needed"
+            else:
+                missing = ", ".join(missing_signals[:-1])
+                if len(missing_signals) > 1:
+                    missing = f"{missing} and {missing_signals[-1]}"
+                else:
+                    missing = missing_signals[0] if missing_signals else "Overnight data"
+                message = f"Waiting for {missing}"
+            return ReadinessScore(
+                score=None,
+                label="unavailable",
+                message=message,
+                components=components,
+                baseline_days=baseline_days,
+                method_version=READINESS_METHOD_VERSION,
+            )
+        score = round(weighted_score)
+        label = "low" if score < 30 else "moderate" if score < 65 else "high"
+        return ReadinessScore(
+            score=score,
+            label=label,
+            message=f"{label.capitalize()} readiness",
+            components=components,
+            baseline_days=baseline_days,
+            method_version=READINESS_METHOD_VERSION,
         )
 
     def _sentence(self, metrics: list[MetricSummary]) -> str:

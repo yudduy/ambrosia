@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType } from "react";
-import { Activity, Asleep, Chat, Home, Moon, Restaurant, Sun, UserAvatar } from "@carbon/icons-react";
+import { Activity, Asleep, Chat, Moon, Restaurant, Sun, UserAvatar } from "@carbon/icons-react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { AskDrawer } from "./components/AskDrawer";
 import { ProfilePanel } from "./components/ProfilePanel";
@@ -8,7 +8,7 @@ import { DomainPage } from "./pages/DomainPage";
 import { NutritionPage } from "./pages/NutritionPage";
 
 const navigation: Array<[string, string, ComponentType<{ size?: number }>]> = [
-  ["Home", "/", Home],
+  ["Today", "/", Sun],
   ["Fitness", "/fitness", Activity],
   ["Sleep", "/sleep", Asleep],
   ["Nutrition", "/nutrition", Restaurant],

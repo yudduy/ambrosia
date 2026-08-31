@@ -39,6 +39,22 @@ def test_home_uses_28_valid_day_baseline(database, app_settings):
     assert steps.coverage.covered_days == 7
     assert result.provenance.date_start == date(2026, 8, 23)
     assert result.sentence
+    assert result.readiness.score == 84
+    assert result.readiness.label == "high"
+    assert [component.key for component in result.readiness.components] == [
+        "sleep_duration", "hrv", "resting_hr",
+    ]
+    assert len(result.readiness_history) == 7
+    assert next(metric for metric in result.today_metrics if metric.key == "steps").value == 11100
+
+
+def test_readiness_waits_for_all_three_personal_baselines(database, app_settings):
+    end = date(2026, 8, 29)
+    seed_days(database, end, 10)
+    result = HealthAnalysis(database, app_settings).home(end)
+    assert result.readiness.score is None
+    assert result.readiness.label == "unavailable"
+    assert result.readiness.baseline_days == 9
 
 
 def test_baseline_withholds_conclusion_under_14_days(database, app_settings):

@@ -21,6 +21,11 @@ def test_typed_dashboard_and_compiled_frontend_are_served(tmp_path: Path):
         assert home["coverage"]["expected_days"] == 7
         assert home["provenance"]["method_version"] == "personal-baseline-v1"
         assert len(home["metrics"]) == 7
+        assert len(home["today_metrics"]) == 6
+        assert len(home["overnight_metrics"]) == 5
+        assert len(home["readiness_history"]) == 7
+        assert home["readiness"]["method_version"] == "personal-readiness-v1"
+        assert home["sync"]["configured"] is False
         assert client.get("/api/fitness?range=90d").json()["range"] == "90d"
         page = client.get("/")
         assert page.status_code == 200
@@ -78,4 +83,3 @@ def test_mcp_facing_responses_do_not_expose_private_fields(tmp_path: Path):
         ]
     lowered = "\n".join(payloads).lower()
     assert all(value not in lowered for value in forbidden)
-

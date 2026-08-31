@@ -1,8 +1,8 @@
 # Ambrosia
 
-Ambrosia is a private, single-user health dashboard for Fitbit data available through Google Health. It turns the latest seven days into plain comparisons against the preceding 28 valid personal days, keeps the deterministic analysis on your Mac, and offers an optional ChatGPT-backed consultation through the official Codex app-server.
+Ambrosia is a private, single-user health dashboard for Fitbit data available through Google Health. Its Today page combines overnight recovery with the current day's activity, keeps the analysis on your Mac, and offers an optional ChatGPT-backed consultation through the official Codex app-server.
 
-The product has four tabs: Home, Fitness, Sleep, and Nutrition. It does not produce a proprietary health score, diagnose conditions, or silently save AI output.
+The product has four tabs: Today, Fitness, Sleep, and Nutrition. Readiness is a transparent personal estimate: sleep contributes 40%, HRV 30%, and resting heart rate 30%, with each signal ranked against the previous 28 valid days. It does not reproduce Google or Eight Sleep's private algorithms, diagnose conditions, or silently save AI output.
 
 ## Run locally
 

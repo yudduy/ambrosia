@@ -50,6 +50,31 @@ class MetricSummary(BaseModel):
     coverage: Coverage
 
 
+class ReadinessComponent(BaseModel):
+    key: Literal["sleep_duration", "hrv", "resting_hr"]
+    label: str
+    value: float
+    unit: str
+    score: int
+    baseline_median: float
+    baseline_days: int
+
+
+class ReadinessScore(BaseModel):
+    score: int | None
+    label: Literal["low", "moderate", "high", "unavailable"]
+    message: str
+    components: list[ReadinessComponent]
+    baseline_days: int
+    method_version: str
+
+
+class DailyReadiness(BaseModel):
+    date: date
+    score: int | None
+    label: Literal["low", "moderate", "high", "unavailable"]
+
+
 class WeeklyReport(BaseModel):
     week_start: date
     generated_at: datetime
@@ -72,6 +97,10 @@ class HomeResponse(BaseModel):
     provenance: Provenance
     report: WeeklyReport | None
     sync: dict[str, Any]
+    readiness: ReadinessScore
+    readiness_history: list[DailyReadiness]
+    today_metrics: list[MetricSummary]
+    overnight_metrics: list[MetricSummary]
 
 
 class DomainResponse(BaseModel):
