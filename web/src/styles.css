@@ -109,6 +109,9 @@ main { min-height: 100dvh; margin-left: var(--sidebar); padding: 0 42px 100px; }
 .trend-section .chart-grid-backdrop { fill: transparent !important; }
 .trend-section text { fill: var(--muted) !important; font-family: var(--mono) !important; font-size: 9px !important; }
 .trend-section .grid g line { stroke: var(--line) !important; }
+.ambrosia-chart-tooltip { display: grid; gap: 4px; min-width: 108px; color: var(--muted); font-size: 10px; line-height: 1.25; }
+.ambrosia-chart-tooltip strong { color: var(--text); font-size: 14px; font-weight: 600; }
+.ambrosia-chart-tooltip small { color: var(--muted); font: 9px/1 var(--mono); font-weight: 400; }
 
 .detail-card { display: grid; grid-template-columns: 190px 1fr; gap: 28px; margin-top: 32px; padding: 24px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .detail-card__heading { display: flex; flex-direction: column; gap: 10px; }
