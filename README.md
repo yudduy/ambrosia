@@ -1,6 +1,6 @@
 # Ambrosia
 
-Ambrosia is a private, single-user health dashboard for Fitbit data available through Google Health. Its Today page combines overnight recovery with the current day's activity, keeps the analysis on your Mac, and offers an optional ChatGPT-backed consultation through the official Codex app-server.
+Ambrosia is a private, single-user health dashboard for Fitbit data available through Google Health. Its Today page combines overnight recovery with the current day's activity, keeps the analysis on your Mac, and includes one ChatGPT-backed conversation across sleep, fitness, nutrition, and history.
 
 The product has four tabs: Today, Fitness, Sleep, and Nutrition. Readiness is a transparent personal estimate: sleep contributes 40%, HRV 30%, and resting heart rate 30%, with each signal ranked against the previous 28 valid days. It does not reproduce Google or Eight Sleep's private algorithms, diagnose conditions, or silently save AI output.
 
@@ -40,11 +40,11 @@ uv run ambrosia sync --type nutrition-log --type hydration-log
 
 The original responses are retained as immutable compressed files with hashes and counts. Normalized DuckDB tables and portable Parquet snapshots live under `AMBROSIA_HOME`, never in this repository.
 
-## AI and meal photos
+## Health chat and meal photos
 
-The first AI action starts `codex app-server` over stdio with an isolated `CODEX_HOME`. Sign-in is managed by ChatGPT. Ambrosia discovers an image-capable model instead of hardcoding one and exposes only five bounded aggregate-health MCP tools. If the full target-machine compatibility gate fails, Ambrosia records the result and switches future conversations to the bundled OMP sidecar. OMP exposes the same five bounded tools and accepts images only from Ambrosia's sanitized upload directory; it exposes no shell or general filesystem tool. The Today page can request one short model-written summary; it is generated only after the AI disclosure has been accepted.
+The first AI action starts `codex app-server` over stdio with an isolated `CODEX_HOME`. Sign-in is managed by ChatGPT. Ambrosia discovers an image-capable model instead of hardcoding one and exposes only five bounded aggregate-health MCP tools. If the full target-machine compatibility gate fails, Ambrosia records the result and switches future conversations to the bundled OMP sidecar. OMP exposes the same five bounded tools and accepts images only from Ambrosia's sanitized upload directory; it exposes no shell or general filesystem tool.
 
-Meal uploads are EXIF-stripped, resized locally, and deleted after 24 hours if abandoned. AI returns editable nutrition ranges; the meal is not saved until the user confirms it. Routine sync, comparisons, and weekly reports do not invoke AI.
+The global Health chat signs in once, retains its messages locally, resumes the same provider thread, and can use bounded summaries from every dashboard domain. Meal photos are attachments in that conversation. Uploads are EXIF-stripped, resized locally, and deleted after 24 hours if abandoned. Routine sync, comparisons, and weekly reports do not invoke AI.
 
 Run the non-destructive compatibility checks with:
 
