@@ -2,12 +2,13 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Renew } from "@carbon/icons-react";
 import { api } from "../lib/api";
-import type { DailyReadiness, MetricSummary, ReadinessComponent } from "../lib/types";
+import type { DailyInsight, DailyReadiness, MetricSummary, ReadinessComponent, ReadinessScore } from "../lib/types";
 
-export function HomePage() {
+export function HomePage({ onAsk }: { onAsk: () => void }) {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState<string>();
   const [currentWeek, setCurrentWeek] = useState<DailyReadiness[]>();
+  const [insights, setInsights] = useState<Record<string, DailyInsight>>({});
   const query = useQuery({
     queryKey: ["home", selectedDate ?? "today"],
     queryFn: () => api.home(selectedDate),
@@ -20,6 +21,10 @@ export function HomePage() {
       await queryClient.invalidateQueries({ queryKey: ["home"] });
     },
   });
+  const insight = useMutation({
+    mutationFn: api.homeInsight,
+    onSuccess: (result) => setInsights((current) => ({ ...current, [result.as_of]: result })),
+  });
 
   useEffect(() => {
     if (!selectedDate && query.data) setCurrentWeek(query.data.readiness_history);
@@ -31,6 +36,14 @@ export function HomePage() {
   const isToday = data.as_of === localDate();
   const history = currentWeek ?? data.readiness_history;
   const syncConfigured = Boolean(data.sync.configured);
+
+  function summarizeToday() {
+    if (localStorage.getItem("ambrosia-ai-disclosure") !== "accepted") {
+      onAsk();
+      return;
+    }
+    insight.mutate(data.as_of);
+  }
 
   return (
     <div className="page today-page">
@@ -55,35 +68,14 @@ export function HomePage() {
 
       <DateStrip history={history} selected={data.as_of} onSelect={setSelectedDate} />
 
-      <section className="readiness-panel" aria-labelledby="readiness-title">
-        <ScoreRing score={data.readiness.score} label={data.readiness.label} />
-        <div className="readiness-content">
-          <div className="readiness-heading">
-            <div>
-              <p>Personal readiness</p>
-              <h2 id="readiness-title">
-                {data.readiness.score === null ? data.readiness.message : capitalize(data.readiness.label)}
-              </h2>
-            </div>
-            <span>{data.readiness.baseline_days}/28 baseline days</span>
-          </div>
-          <div className="readiness-components">
-            {data.readiness.components.map((component) => (
-              <ReadinessSignal key={component.key} component={component} />
-            ))}
-            {data.readiness.components.length === 0 && (
-              <p className="readiness-empty">Sleep, HRV and resting heart rate are needed.</p>
-            )}
-          </div>
-          <details className="score-method">
-            <summary>How the score works</summary>
-            <p>
-              Sleep is 40%. HRV and resting heart rate are 30% each. Every signal is ranked against
-              your previous 28 valid days. A score appears after 14 baseline days for all three.
-            </p>
-          </details>
-        </div>
-      </section>
+      <DailyInsightLine
+        value={insights[data.as_of]}
+        pending={insight.isPending && insight.variables === data.as_of}
+        error={insight.error}
+        onSummarize={summarizeToday}
+      />
+
+      <ReadinessPanel readiness={data.readiness} />
 
       <MetricSection
         title={isToday ? "Today so far" : "That day"}
@@ -103,6 +95,54 @@ export function HomePage() {
         </div>
       </details>
     </div>
+  );
+}
+
+function DailyInsightLine({
+  value, pending, error, onSummarize,
+}: {
+  value?: DailyInsight;
+  pending: boolean;
+  error: Error | null;
+  onSummarize: () => void;
+}) {
+  if (value) {
+    return <section className="daily-insight" aria-label="AI summary"><span>AI</span><p>{value.text}</p></section>;
+  }
+  return (
+    <section className="daily-insight daily-insight--empty" aria-live="polite">
+      <button type="button" onClick={onSummarize} disabled={pending}>{pending ? "Summarizing" : "Summarize with AI"}</button>
+      {error && <span>{error.message}</span>}
+    </section>
+  );
+}
+
+function ReadinessPanel({ readiness }: { readiness: ReadinessScore }) {
+  if (readiness.score === null) {
+    return (
+      <section className="readiness-panel readiness-panel--empty" aria-labelledby="readiness-title">
+        <p>Readiness</p>
+        <h2 id="readiness-title">{readiness.baseline_days < 14 ? "Building your baseline" : "Waiting for last night’s data"}</h2>
+      </section>
+    );
+  }
+  return (
+    <section className="readiness-panel" aria-labelledby="readiness-title">
+      <ScoreRing score={readiness.score} label={readiness.label} />
+      <div className="readiness-content">
+        <div className="readiness-heading">
+          <div><p>Readiness</p><h2 id="readiness-title">{capitalize(readiness.label)}</h2></div>
+          <span>{readiness.baseline_days}/28 baseline days</span>
+        </div>
+        <div className="readiness-components">
+          {readiness.components.map((component) => <ReadinessSignal key={component.key} component={component} />)}
+        </div>
+        <details className="score-method">
+          <summary>How the score works</summary>
+          <p>Sleep is 40%. HRV and resting heart rate are 30% each. Each is compared with your previous 28 valid days.</p>
+        </details>
+      </div>
+    </section>
   );
 }
 

@@ -42,7 +42,7 @@ The original responses are retained as immutable compressed files with hashes an
 
 ## AI and meal photos
 
-The first AI action starts `codex app-server` over stdio with an isolated `CODEX_HOME`. Sign-in is managed by ChatGPT. Ambrosia discovers an image-capable model instead of hardcoding one and exposes only five bounded aggregate-health MCP tools. If the full target-machine compatibility gate fails, Ambrosia records the result and switches future conversations to the bundled OMP sidecar. OMP exposes the same five bounded tools and accepts images only from Ambrosia's sanitized upload directory; it exposes no shell or general filesystem tool.
+The first AI action starts `codex app-server` over stdio with an isolated `CODEX_HOME`. Sign-in is managed by ChatGPT. Ambrosia discovers an image-capable model instead of hardcoding one and exposes only five bounded aggregate-health MCP tools. If the full target-machine compatibility gate fails, Ambrosia records the result and switches future conversations to the bundled OMP sidecar. OMP exposes the same five bounded tools and accepts images only from Ambrosia's sanitized upload directory; it exposes no shell or general filesystem tool. The Today page can request one short model-written summary; it is generated only after the AI disclosure has been accepted.
 
 Meal uploads are EXIF-stripped, resized locally, and deleted after 24 hours if abandoned. AI returns editable nutrition ranges; the meal is not saved until the user confirms it. Routine sync, comparisons, and weekly reports do not invoke AI.
 

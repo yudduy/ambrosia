@@ -1,5 +1,6 @@
 import type {
   AssistantStatus,
+  DailyInsight,
   Domain,
   DomainResponse,
   HomeResponse,
@@ -36,6 +37,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   home: (date?: string) => request<HomeResponse>(`/api/home${date ? `?date=${date}` : ""}`),
+  homeInsight: (date: string) =>
+    request<DailyInsight>(`/api/home/insight?date=${date}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ disclosure_accepted: true }),
+    }),
   sync: () => request<Record<string, unknown>>("/api/sync", { method: "POST" }),
   reports: () => request<{ generated_at: string; reports: WeeklyReport[] }>("/api/reports?limit=12"),
   domain: (domain: Domain, range: RangeName) =>

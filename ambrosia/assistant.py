@@ -9,11 +9,12 @@ import uuid
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import AsyncIterator
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 from .config import Settings, settings
-from .models import AssistantStatus, MealAnalysis
+from .models import AssistantStatus, DailyInsightDraft, MealAnalysis
 
 
 SAFETY_CONTEXT = """You are Ambrosia, a private personal health coach. Use only the bounded
@@ -434,6 +435,12 @@ MEAL_PROMPT = """Analyze this meal photo and optional note. Return conservative 
 not exact values. Include visible ingredients, meal type, confidence from 0 to 1, and a short note
 about what the image cannot establish. Do not infer medical conditions. Optional note: {note}"""
 
+DAILY_INSIGHT_PROMPT = """Call get_health_overview for {as_of}. Write one plain-English sentence
+of at most 24 words that helps the user understand that day at a glance. Use only the returned
+evidence. Mention at most two useful facts. Prefer available activity when recovery data is missing.
+Do not recalculate or invent a score, grade the day, give advice, or make a medical claim. If there
+is no meaningful measured data, return exactly: Not enough data yet."""
+
 
 def strict_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
     output = copy.deepcopy(schema)
@@ -459,3 +466,11 @@ async def analyze_meal(provider: CodexAppServerProvider, image_path: Path, note:
         image_path=image_path,
     )
     return MealAnalysis.model_validate(result)
+
+
+async def generate_daily_insight(provider: CodexAppServerProvider, as_of: date) -> DailyInsightDraft:
+    result = await provider.run_structured(
+        DAILY_INSIGHT_PROMPT.format(as_of=as_of.isoformat()),
+        strict_output_schema(DailyInsightDraft.model_json_schema()),
+    )
+    return DailyInsightDraft.model_validate(result)

@@ -92,6 +92,14 @@ export interface HomeResponse {
   overnight_metrics: MetricSummary[];
 }
 
+export interface DailyInsight {
+  as_of: string;
+  text: string;
+  generated_at: string;
+  provider: string;
+  model: string;
+}
+
 export interface DomainResponse {
   generated_at: string;
   domain: Domain;

@@ -8,6 +8,32 @@ from PIL import Image
 
 from ambrosia.api import create_app
 from ambrosia.config import Settings
+from ambrosia.models import AssistantStatus
+
+
+class FakeInsightProvider:
+    def __init__(self):
+        self.calls = 0
+
+    async def status(self):
+        return AssistantStatus(
+            provider="codex-app-server",
+            running=True,
+            authenticated=True,
+            image_capable_model=True,
+            model="test-model",
+            reason=None,
+        )
+
+    async def run_structured(self, prompt, schema, image_path=None):
+        self.calls += 1
+        assert "get_health_overview" in prompt
+        assert schema["additionalProperties"] is False
+        assert image_path is None
+        return {"text": "Activity is available; recovery data has not arrived yet."}
+
+    async def close(self):
+        return None
 
 
 def test_typed_dashboard_and_compiled_frontend_are_served(tmp_path: Path):
@@ -41,6 +67,27 @@ def test_profile_requires_explicit_http_update(tmp_path: Path):
         updated = client.put("/api/profile", json=profile)
         assert updated.status_code == 200
         assert client.get("/api/profile").json()["goal"] == "Improve sleep consistency"
+
+
+def test_daily_insight_requires_disclosure_and_is_cached(tmp_path: Path):
+    settings = Settings(home=tmp_path / "runtime")
+    with TestClient(create_app(settings)) as client:
+        provider = FakeInsightProvider()
+        client.app.state.assistant = provider
+        denied = client.post(
+            "/api/home/insight?date=2026-08-30", json={"disclosure_accepted": False}
+        )
+        assert denied.status_code == 400
+        response = client.post(
+            "/api/home/insight?date=2026-08-30", json={"disclosure_accepted": True}
+        )
+        assert response.status_code == 200
+        assert response.json()["text"] == "Activity is available; recovery data has not arrived yet."
+        assert response.json()["model"] == "test-model"
+        assert client.post(
+            "/api/home/insight?date=2026-08-30", json={"disclosure_accepted": True}
+        ).status_code == 200
+        assert provider.calls == 1
 
 
 def test_meal_upload_is_sanitized_before_ai(tmp_path: Path):

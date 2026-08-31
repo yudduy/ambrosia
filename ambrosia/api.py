@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .analysis import METRICS, HealthAnalysis
-from .assistant import AssistantError, assistant_provider
+from .assistant import AssistantError, assistant_provider, generate_daily_insight
 from .config import Settings, settings
 from .db import Database, json_value
 from .google_health import GoogleHealthError, GoogleHealthSync
@@ -23,6 +23,8 @@ from .models import (
     AssistantThreadCreate,
     AssistantTurn,
     ConfirmMealRequest,
+    DailyInsight,
+    DailyInsightRequest,
     DomainResponse,
     HomeResponse,
     NutritionDraft,
@@ -66,6 +68,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         app.state.analysis = HealthAnalysis(database, app_settings)
         app.state.nutrition = NutritionService(database, app_settings)
         app.state.assistant = assistant_provider(app_settings)
+        app.state.daily_insights = {}
         app.state.sync = GoogleHealthSync(database, app_settings)
         app.state.nutrition.cleanup_expired()
         task = None
@@ -90,6 +93,44 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     @app.get("/api/home", response_model=HomeResponse)
     def home(request: Request, as_of: date | None = Query(None, alias="date")):
         return request.app.state.analysis.home(as_of)
+
+    @app.post("/api/home/insight", response_model=DailyInsight)
+    async def home_insight(
+        request: Request,
+        body: DailyInsightRequest,
+        as_of: date | None = Query(None, alias="date"),
+    ):
+        if not body.disclosure_accepted:
+            raise HTTPException(status_code=400, detail="Accept the AI data disclosure before continuing.")
+        day = as_of or datetime.now(app_settings.tz).date()
+        overview = request.app.state.analysis.home(day)
+        displayed_values = tuple(
+            (metric.key, metric.value) for metric in overview.today_metrics + overview.overnight_metrics
+        )
+        cache_key = (
+            day.isoformat(), str(overview.sync.get("finished_at") or "no-sync"),
+            overview.readiness.score, displayed_values,
+        )
+        if cached := request.app.state.daily_insights.get(cache_key):
+            return cached
+        status = await request.app.state.assistant.status()
+        if not status.authenticated:
+            raise HTTPException(status_code=401, detail=status.reason or "ChatGPT sign-in is required.")
+        if not status.model:
+            raise HTTPException(status_code=400, detail="No compatible model is available.")
+        try:
+            draft = await generate_daily_insight(request.app.state.assistant, day)
+        except AssistantError as error:
+            _raise_bad_request(error)
+        result = DailyInsight(
+            as_of=day,
+            text=draft.text,
+            generated_at=datetime.now(UTC),
+            provider=status.provider,
+            model=status.model,
+        )
+        request.app.state.daily_insights[cache_key] = result
+        return result
 
     @app.get("/api/reports", response_model=WeeklyReportsResponse)
     def reports(request: Request, limit: int = Query(52, ge=1, le=260)):

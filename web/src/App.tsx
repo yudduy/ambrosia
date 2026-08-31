@@ -41,7 +41,7 @@ export function App() {
       <header className="mobile-header"><div className="brand"><span className="brand__mark">A</span><strong>Ambrosia</strong></div><div><button className="icon-button" onClick={() => setDark((value) => !value)} aria-label="Toggle color theme">{dark ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-button" onClick={() => setProfileOpen(true)} aria-label="Open profile"><UserAvatar size={20} /></button></div></header>
       <main id="main-content">
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<HomePage onAsk={() => setAssistantOpen(true)} />} />
           <Route path="/fitness" element={<DomainPage domain="fitness" />} />
           <Route path="/sleep" element={<DomainPage domain="sleep" />} />
           <Route path="/nutrition" element={<NutritionPage />} />

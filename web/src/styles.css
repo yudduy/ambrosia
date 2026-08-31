@@ -89,7 +89,18 @@ main { min-height: 100dvh; margin-left: var(--sidebar); padding: 0 42px 100px; }
 .date-strip button > strong { isolation: isolate; }
 .date-strip button > strong::before { z-index: -1; }
 
+.daily-insight { display: flex; align-items: baseline; gap: 12px; min-height: 44px; padding: 14px 0 10px; border-bottom: 1px solid var(--line); }
+.daily-insight > span { flex: 0 0 auto; color: var(--green); font: 9px/1 var(--mono); }
+.daily-insight > p { margin: 0; font-size: 13px; line-height: 1.45; }
+.daily-insight--empty button { padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
+.daily-insight--empty button:hover:not(:disabled) { color: var(--green); }
+.daily-insight--empty button:disabled { cursor: wait; }
+.daily-insight--empty > span { color: var(--amber); font: 9px/1.4 var(--sans); }
+
 .readiness-panel { display: grid; grid-template-columns: 250px 1fr; align-items: center; gap: 44px; margin-top: 30px; padding: 34px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.readiness-panel.readiness-panel--empty { display: block; margin-top: 18px; padding: 20px 0; border-right: 0; border-left: 0; border-radius: 0; background: transparent; }
+.readiness-panel--empty > p { margin: 0 0 6px; color: var(--muted); font-size: 10px; }
+.readiness-panel--empty > h2 { margin: 0; font-size: 18px; font-weight: 560; letter-spacing: -.02em; }
 .score-ring { --readiness-score: 0; display: grid; place-items: center; width: 220px; aspect-ratio: 1; margin: 0 auto; border-radius: 50%; background: conic-gradient(var(--green) calc(var(--readiness-score) * 1%), var(--line) 0); }
 .score-ring > div { display: flex; align-items: center; justify-content: center; flex-direction: column; width: 184px; aspect-ratio: 1; border-radius: 50%; background: var(--surface); }
 .score-ring strong { font-size: 68px; font-weight: 560; line-height: .95; letter-spacing: -.065em; }

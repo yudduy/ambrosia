@@ -202,6 +202,22 @@ class AssistantTurn(BaseModel):
     image_draft_id: UUID | None = None
 
 
+class DailyInsightRequest(BaseModel):
+    disclosure_accepted: bool
+
+
+class DailyInsightDraft(BaseModel):
+    text: str = Field(min_length=1, max_length=240)
+
+
+class DailyInsight(BaseModel):
+    as_of: date
+    text: str
+    generated_at: datetime
+    provider: str
+    model: str
+
+
 class AssistantStatus(BaseModel):
     provider: str
     running: bool

@@ -6,9 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from ambrosia.assistant import AssistantError, OmpSidecarProvider, assistant_provider, strict_output_schema
+from ambrosia.assistant import (
+    AssistantError,
+    OmpSidecarProvider,
+    assistant_provider,
+    strict_output_schema,
+)
 from ambrosia.config import Settings
-from ambrosia.models import MealAnalysis
+from ambrosia.models import DailyInsightDraft, MealAnalysis
 
 
 def test_meal_schema_is_strict_for_every_nested_object():
@@ -26,6 +31,7 @@ def test_meal_schema_is_strict_for_every_nested_object():
                 assert_strict(value)
 
     assert_strict(schema)
+    assert_strict(strict_output_schema(DailyInsightDraft.model_json_schema()))
 
 
 def test_verified_fallback_configuration_selects_omp(tmp_path: Path):
