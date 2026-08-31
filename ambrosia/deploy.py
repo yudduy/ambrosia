@@ -54,7 +54,10 @@ def launch_agent_payload(
             "AMBROSIA_HOME": str(app_settings.home),
             "AMBROSIA_GOOGLE_CREDENTIALS": str(credentials),
             "AMBROSIA_GOOGLE_TOKEN": str(token),
-            "PATH": f"{uv_path.parent}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+            "PATH": (
+                f"{uv_path.parent}:{Path.home() / '.local' / 'bin'}:"
+                "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            ),
         },
         "RunAtLoad": True,
         "KeepAlive": {"SuccessfulExit": False},

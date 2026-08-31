@@ -17,3 +17,4 @@ def test_launch_agent_is_loopback_only_and_keeps_secrets_out_of_arguments(app_se
     assert str(credentials) not in arguments
     assert str(token) not in arguments
     assert payload["EnvironmentVariables"]["AMBROSIA_GOOGLE_TOKEN"] == str(token)
+    assert str(Path.home() / ".local" / "bin") in payload["EnvironmentVariables"]["PATH"].split(":")
