@@ -180,8 +180,8 @@ class Database:
         self._lock = threading.RLock()
         self._connection = duckdb.connect(str(self.settings.database_path))
         self._connection.execute("SET TimeZone='UTC'")
-        # Leave headroom for Python, Arrow batches, and the web process on an 8 GB host.
-        self._connection.execute("SET memory_limit='900MiB'")
+        # Leave headroom for Python, Arrow batches, and the web process on a small always-on Mac.
+        self._connection.execute("SET memory_limit='700MiB'")
         temporary = str(self.settings.temp_dir).replace("'", "''")
         self._connection.execute(f"SET temp_directory='{temporary}'")
         self._connection.execute(SCHEMA)
