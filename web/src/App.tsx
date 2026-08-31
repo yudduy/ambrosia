@@ -47,7 +47,7 @@ export function App() {
           <Route path="/nutrition" element={<NutritionPage />} />
         </Routes>
       </main>
-      <button className="ask-fab" aria-label="Ask Ambrosia" onClick={() => setAssistantOpen(true)}><Chat size={20} /><span>Ask</span></button>
+      <button className="ask-fab" aria-label="Open health chat" onClick={() => setAssistantOpen(true)}><Chat size={20} /><span>Chat</span></button>
       <nav className="bottom-nav" aria-label="Primary navigation">
         {navigation.map(([label, path, Icon]) => <NavLink key={path} to={path} end={path === "/"}><Icon size={20} /><span>{label}</span></NavLink>)}
       </nav>

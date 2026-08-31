@@ -26,29 +26,50 @@ test("dashboard navigates every domain without horizontal overflow", async ({ pa
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("meal photo is analyzed in one action and waits for confirmation", async ({ page }) => {
+test("health chat accepts a meal photo and restores the conversation", async ({ page }) => {
   const thumbnail = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
   const uploaded = {
     id: "draft-1", created_at: "2026-08-30T20:00:00Z", expires_at: "2026-08-31T20:00:00Z",
-    status: "uploaded", note: "Chicken bowl after the gym", thumbnail_url: thumbnail, analysis: null,
+    status: "uploaded", note: null, thumbnail_url: thumbnail, analysis: null,
   };
-  const analyzed = {
-    ...uploaded,
-    status: "ready",
-    analysis: {
-      description: "Chicken rice bowl", meal_type: "meal",
-      calories: { low: 600, high: 750 }, protein_g: { low: 40, high: 55 },
-      carbs_g: { low: 65, high: 90 }, fat_g: { low: 14, high: 24 },
-      sodium_mg: { low: 700, high: 1100 }, ingredients: ["chicken", "rice", "vegetables"],
-      confidence: 0.76, uncertainty_note: "Portion size cannot be confirmed from the photo.",
-    },
-  };
+  let persisted = false;
+  await page.addInitScript(() => localStorage.setItem("ambrosia-ai-disclosure", "accepted"));
+  await page.route("**/api/assistant/status", (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({
+      provider: "omp", running: true, authenticated: true,
+      image_capable_model: true, model: "test-model", login_url: null, reason: null,
+    }),
+  }));
+  await page.route("**/api/assistant/conversation", (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify(persisted ? {
+      thread: { id: "thread-1", provider: "omp", created_at: "2026-08-30T20:00:00Z", title: "My health chat" },
+      messages: [
+        { id: "user-1", role: "user", text: "How does this fit my training?", image_url: thumbnail, created_at: "2026-08-30T20:01:00Z" },
+        { id: "reply-1", role: "assistant", text: "It looks protein-forward. Portion size is uncertain.", image_url: null, created_at: "2026-08-30T20:01:01Z" },
+      ],
+    } : { thread: null, messages: [] }),
+  }));
+  await page.route("**/api/assistant/threads", (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ id: "thread-1" }),
+  }));
   await page.route("**/api/nutrition/uploads", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(uploaded) }));
-  await page.route("**/api/nutrition/drafts/draft-1/**", (route) => {
-    const body = route.request().url().endsWith("/analyze") ? analyzed : { ...analyzed, status: "confirmed" };
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  await page.route("**/api/assistant/threads/thread-1/events?live=true", (route) => route.fulfill({
+    status: 200,
+    contentType: "text/event-stream",
+    body: "retry: 60000\nevent: message_completed\ndata: {\"text\":\"It looks protein-forward. Portion size is uncertain.\"}\n\n",
+  }));
+  await page.route("**/api/assistant/threads/thread-1/turns", (route) => {
+    persisted = true;
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ turn_id: "turn-1" }) });
   });
   await page.goto("/nutrition");
+  await expect(page.getByRole("heading", { name: "Nutrition", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Analyze a meal" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Open health chat" }).click();
+  await expect(page.getByRole("heading", { name: "What do you want to know?" })).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles({
     name: "meal.png",
     mimeType: "image/png",
@@ -58,10 +79,12 @@ test("meal photo is analyzed in one action and waits for confirmation", async ({
     ),
   });
   await expect(page.getByText("meal.png", { exact: true })).toBeVisible();
-  await page.getByLabel("Meal note").fill("Chicken bowl after the gym");
-  await page.getByRole("button", { name: "Analyze meal" }).click();
-  await expect(page.getByRole("heading", { name: "Estimate" })).toBeVisible();
-  await expect(page.locator('input[value="Chicken rice bowl"]')).toBeVisible();
-  await page.getByRole("button", { name: "Save meal" }).click();
-  await expect(page.getByRole("heading", { name: "Analyze a meal" })).toBeVisible();
+  await page.getByPlaceholder("Ask about your health").fill("How does this fit my training?");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("It looks protein-forward. Portion size is uncertain.")).toBeVisible();
+  await expect.poll(() => persisted).toBe(true);
+  await page.reload();
+  await page.getByRole("button", { name: "Open health chat" }).click();
+  await expect(page.getByText("How does this fit my training?")).toBeVisible();
+  await expect(page.getByText("It looks protein-forward. Portion size is uncertain.")).toBeVisible();
 });

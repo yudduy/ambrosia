@@ -1,6 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 
 Element.prototype.scrollIntoView = () => undefined;
+globalThis.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
 
 const values = new Map<string, string>();
 Object.defineProperty(globalThis, "localStorage", {

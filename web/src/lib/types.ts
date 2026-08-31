@@ -149,6 +149,26 @@ export interface AssistantStatus {
   reason: string | null;
 }
 
+export interface AssistantMessage {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  image_url: string | null;
+  created_at: string;
+}
+
+export interface AssistantThread {
+  id: string;
+  provider: string;
+  created_at: string;
+  title: string | null;
+}
+
+export interface AssistantConversation {
+  thread: AssistantThread | null;
+  messages: AssistantMessage[];
+}
+
 export interface Profile {
   goal: string | null;
   time_horizon: string | null;

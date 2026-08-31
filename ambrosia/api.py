@@ -19,6 +19,8 @@ from .db import Database, json_value
 from .google_health import GoogleHealthError, GoogleHealthSync
 from .models import (
     AssistantStatus,
+    AssistantConversation,
+    AssistantMessage,
     AssistantThread,
     AssistantThreadCreate,
     AssistantTurn,
@@ -58,6 +60,34 @@ async def _sync_loop(app: FastAPI) -> None:
         await asyncio.sleep(app_settings.sync_interval_seconds)
 
 
+async def _store_assistant_reply(
+    app: FastAPI, thread_id: str, provider_thread_id: str, turn_id: str,
+) -> None:
+    async for event in app.state.assistant.events(provider_thread_id):
+        params = event.get("params") or {}
+        event_turn_id = params.get("turnId") or (params.get("turn") or {}).get("id")
+        if event_turn_id != turn_id:
+            continue
+        if event.get("method") == "item/completed":
+            item = params.get("item") or {}
+            text = str(item.get("text") or "").strip()
+            if item.get("type") == "agentMessage" and text:
+                provider_item_id = str(item.get("id") or turn_id)
+                app.state.db.execute(
+                    """
+                    INSERT INTO assistant_messages VALUES (?, ?, 'assistant', ?, NULL, ?, ?)
+                    ON CONFLICT (thread_id, provider_item_id) DO NOTHING
+                    """,
+                    [uuid.uuid4(), thread_id, text, datetime.now(UTC), provider_item_id],
+                )
+        if event.get("method") == "turn/completed":
+            app.state.db.execute(
+                "UPDATE assistant_threads SET updated_at=? WHERE id=?",
+                [datetime.now(UTC), thread_id],
+            )
+            return
+
+
 def create_app(app_settings: Settings = settings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -68,6 +98,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         app.state.analysis = HealthAnalysis(database, app_settings)
         app.state.nutrition = NutritionService(database, app_settings)
         app.state.assistant = assistant_provider(app_settings)
+        app.state.assistant_tasks = set()
         app.state.daily_insights = {}
         app.state.sync = GoogleHealthSync(database, app_settings)
         app.state.nutrition.cleanup_expired()
@@ -81,6 +112,10 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
                 await task
             except asyncio.CancelledError:
                 pass
+        for assistant_task in list(app.state.assistant_tasks):
+            assistant_task.cancel()
+        if app.state.assistant_tasks:
+            await asyncio.gather(*app.state.assistant_tasks, return_exceptions=True)
         await app.state.assistant.close()
         database.close()
 
@@ -308,6 +343,35 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         )
         return AssistantThread(id=local_id, provider=provider_name, created_at=created, title=body.title)
 
+    @app.get("/api/assistant/conversation", response_model=AssistantConversation)
+    def assistant_conversation(request: Request):
+        thread = request.app.state.db.row(
+            "SELECT * FROM assistant_threads ORDER BY updated_at DESC LIMIT 1"
+        )
+        if not thread:
+            return AssistantConversation()
+        messages = request.app.state.db.rows(
+            "SELECT * FROM assistant_messages WHERE thread_id=? ORDER BY created_at, id",
+            [thread["id"]],
+        )
+        return AssistantConversation(
+            thread=AssistantThread(
+                id=thread["id"], provider=thread["provider"],
+                created_at=thread["created_at"], title=thread["title"],
+            ),
+            messages=[
+                AssistantMessage(
+                    id=message["id"], role=message["role"], text=message["text"],
+                    image_url=(
+                        f"/api/nutrition/drafts/{message['image_draft_id']}/image"
+                        if message["image_draft_id"] else None
+                    ),
+                    created_at=message["created_at"],
+                )
+                for message in messages
+            ],
+        )
+
     @app.post("/api/assistant/threads/{thread_id}/turns")
     async def start_turn(request: Request, thread_id: str, body: AssistantTurn):
         row = request.app.state.db.row("SELECT * FROM assistant_threads WHERE id=?", [thread_id])
@@ -326,13 +390,26 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
             )
         except AssistantError as error:
             _raise_bad_request(error)
-        request.app.state.db.execute(
-            "UPDATE assistant_threads SET updated_at=? WHERE id=?", [datetime.now(UTC), thread_id]
+        created = datetime.now(UTC)
+        with request.app.state.db.transaction() as connection:
+            connection.execute(
+                "INSERT INTO assistant_messages VALUES (?, ?, 'user', ?, ?, ?, NULL)",
+                [uuid.uuid4(), thread_id, body.text, body.image_draft_id, created],
+            )
+            connection.execute(
+                "UPDATE assistant_threads SET updated_at=? WHERE id=?", [created, thread_id]
+            )
+        persistence_task = asyncio.create_task(
+            _store_assistant_reply(
+                request.app, thread_id, row["provider_thread_id"], turn_id,
+            )
         )
+        request.app.state.assistant_tasks.add(persistence_task)
+        persistence_task.add_done_callback(request.app.state.assistant_tasks.discard)
         return {"turn_id": turn_id, "status": "started"}
 
     @app.get("/api/assistant/threads/{thread_id}/events")
-    async def assistant_events(request: Request, thread_id: str):
+    async def assistant_events(request: Request, thread_id: str, live: bool = Query(False)):
         row = request.app.state.db.row("SELECT * FROM assistant_threads WHERE id=?", [thread_id])
         if not row:
             raise HTTPException(status_code=404, detail="Assistant thread not found.")
@@ -341,6 +418,8 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
             after_sequence = int(request.headers.get("last-event-id", "0"))
         except ValueError:
             after_sequence = 0
+        if live and after_sequence == 0:
+            after_sequence = int(getattr(request.app.state.assistant, "_event_sequence", 0))
 
         async def stream():
             async for event in request.app.state.assistant.events(

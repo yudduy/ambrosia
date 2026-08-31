@@ -257,7 +257,7 @@ main { min-height: 100dvh; margin-left: var(--sidebar); padding: 0 42px 100px; }
 
 .ask-fab { position: fixed; z-index: 25; right: 24px; bottom: 22px; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 15px; border: 0; border-radius: 22px; background: var(--text); color: var(--surface); box-shadow: var(--shadow); font-size: 11px; font-weight: 600; cursor: pointer; }
 .scrim { position: fixed; z-index: 40; inset: 0; border: 0; background: rgb(9 14 11 / 45%); backdrop-filter: blur(3px); }
-.ask-drawer, .profile-panel { position: fixed; z-index: 50; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow); transform: translateX(102%); transition: transform .2s ease; }
+.ask-drawer, .profile-panel { position: fixed; z-index: 50; top: 0; right: 0; bottom: 0; width: min(520px, 100vw); display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow); transform: translateX(102%); transition: transform .2s ease; }
 .ask-drawer--open, .profile-panel--open { transform: translateX(0); }
 .ask-drawer__header { display: flex; align-items: center; justify-content: space-between; min-height: 60px; padding: 0 14px 0 20px; border-bottom: 1px solid var(--line); }
 .ask-drawer__title { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; }
@@ -271,18 +271,27 @@ main { min-height: 100dvh; margin-left: var(--sidebar); padding: 0 42px 100px; }
 .text-button { display: block; margin-top: 16px; padding: 0; border: 0; border-bottom: 1px solid var(--line-strong); background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
 .messages { flex: 1; overflow: auto; padding: 22px; }
 .assistant-intro { padding: 26px 4px; }
+.assistant-intro > p { max-width: 330px; margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .prompt-chips { display: flex; flex-direction: column; align-items: start; gap: 7px; margin-top: 22px; }
 .prompt-chips button { padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
 .prompt-chips button:hover { border-color: var(--green); color: var(--green); }
 .message { max-width: 90%; margin-bottom: 20px; }
 .message > span { display: block; margin-bottom: 6px; color: var(--muted); font: 8px/1 var(--mono); text-transform: uppercase; }
 .message p { margin: 0; padding: 11px 13px; border-radius: 8px; background: var(--surface-muted); font-size: 11px; line-height: 1.6; white-space: pre-wrap; }
+.message img { display: block; width: min(260px, 100%); max-height: 260px; margin-bottom: 6px; border-radius: 9px; object-fit: cover; }
 .message--user { margin-left: auto; }
 .message--user > span { text-align: right; }
 .message--user p { background: var(--green-soft); }
-.composer { display: grid; grid-template-columns: 1fr 48px; gap: 6px; padding: 11px; border-top: 1px solid var(--line); }
-.composer .cds--text-area { min-height: 72px; resize: none; }
-.composer .cds--btn { width: 48px; max-width: 48px; height: 48px; margin-top: auto; padding: 0; }
+.composer { padding: 10px 11px 11px; border-top: 1px solid var(--line); }
+.composer-row { display: grid; grid-template-columns: 40px 1fr 48px; align-items: end; gap: 6px; }
+.composer-row .cds--text-area { min-height: 48px; resize: none; }
+.composer-row .cds--btn { width: 48px; max-width: 48px; height: 48px; padding: 0; }
+.composer-row .cds--btn:first-of-type { width: 40px; max-width: 40px; }
+.composer-photo { display: grid; grid-template-columns: 42px 1fr 32px; align-items: center; gap: 9px; margin-bottom: 8px; padding: 7px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-muted); }
+.composer-photo img { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; }
+.composer-photo span { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.composer-photo .cds--btn { width: 32px; max-width: 32px; height: 32px; min-height: 32px; padding: 0; }
+.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; }
 .drawer-error { margin: 0 11px 9px; }
 .ask-drawer__footer { padding: 10px; border-top: 1px solid var(--line); color: var(--muted); font: 8px/1 var(--mono); text-align: center; }
 

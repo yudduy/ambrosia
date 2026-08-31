@@ -170,6 +170,18 @@ CREATE TABLE IF NOT EXISTS assistant_threads (
     title VARCHAR,
     metadata JSON
 );
+CREATE TABLE IF NOT EXISTS assistant_messages (
+    id UUID PRIMARY KEY,
+    thread_id UUID NOT NULL,
+    role VARCHAR NOT NULL,
+    text VARCHAR NOT NULL,
+    image_draft_id UUID,
+    created_at TIMESTAMPTZ NOT NULL,
+    provider_item_id VARCHAR,
+    UNIQUE(thread_id, provider_item_id)
+);
+CREATE INDEX IF NOT EXISTS assistant_messages_thread_time
+ON assistant_messages(thread_id, created_at);
 """
 
 

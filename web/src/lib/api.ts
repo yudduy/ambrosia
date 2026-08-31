@@ -1,5 +1,6 @@
 import type {
   AssistantStatus,
+  AssistantConversation,
   DailyInsight,
   Domain,
   DomainResponse,
@@ -71,6 +72,7 @@ export const api = {
   discardMeal: (id: string) =>
     request<void>(`/api/nutrition/drafts/${id}`, { method: "DELETE" }),
   assistantStatus: () => request<AssistantStatus>("/api/assistant/status"),
+  assistantConversation: () => request<AssistantConversation>("/api/assistant/conversation"),
   assistantLogin: () =>
     request<{ authUrl?: string; verificationUrl?: string; userCode?: string }>("/api/assistant/login", {
       method: "POST",
@@ -81,10 +83,10 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, disclosure_accepted: true }),
     }),
-  assistantTurn: (threadId: string, text: string) =>
+  assistantTurn: (threadId: string, text: string, imageDraftId?: string) =>
     request<{ turn_id: string }>(`/api/assistant/threads/${threadId}/turns`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, image_draft_id: imageDraftId }),
     }),
 };

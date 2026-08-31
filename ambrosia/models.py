@@ -197,6 +197,19 @@ class AssistantThread(BaseModel):
     title: str | None
 
 
+class AssistantMessage(BaseModel):
+    id: UUID
+    role: Literal["user", "assistant"]
+    text: str
+    image_url: str | None = None
+    created_at: datetime
+
+
+class AssistantConversation(BaseModel):
+    thread: AssistantThread | None = None
+    messages: list[AssistantMessage] = Field(default_factory=list)
+
+
 class AssistantTurn(BaseModel):
     text: str = Field(min_length=1, max_length=20_000)
     image_draft_id: UUID | None = None
