@@ -6,6 +6,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from .config import Settings
 
@@ -15,6 +16,23 @@ SERVICE_LABEL = "com.ambrosia.health"
 
 class DeploymentError(RuntimeError):
     pass
+
+
+def _copy_runtime_sources(source: Path, destination: Path) -> None:
+    destination.mkdir(parents=True)
+    for filename in ("pyproject.toml", "uv.lock", "README.md"):
+        shutil.copy2(source / filename, destination / filename)
+    shutil.copytree(
+        source / "ambrosia",
+        destination / "ambrosia",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
+    shutil.copytree(source / "web" / "dist", destination / "web" / "dist")
+    shutil.copytree(
+        source / "sidecar",
+        destination / "sidecar",
+        ignore=shutil.ignore_patterns("node_modules"),
+    )
 
 
 def _machine_name() -> str:
@@ -84,19 +102,20 @@ def install_macos(
         if not path.is_file():
             raise DeploymentError(f"{label} file does not exist: {path}")
     uv = shutil.which("uv")
+    bun = shutil.which("bun")
     tailscale = shutil.which("tailscale")
     if not uv:
         raise DeploymentError("uv is not installed or is not on PATH.")
+    if not bun:
+        raise DeploymentError("Bun is not installed or is not on PATH.")
     if not tailscale:
         raise DeploymentError("Tailscale is not installed or is not on PATH.")
-    project_root = Path(__file__).resolve().parents[1]
-    runtime = project_root / ".venv" / "bin" / "ambrosia"
-    if not runtime.is_file():
-        raise DeploymentError("Run `uv sync --frozen` before installing the service.")
-    frontend = project_root / "web" / "dist" / "index.html"
+    source_root = Path(__file__).resolve().parents[1]
+    frontend = source_root / "web" / "dist" / "index.html"
     if not frontend.is_file():
         raise DeploymentError("Build the frontend before installing the service.")
-    payload = launch_agent_payload(app_settings, project_root, Path(uv), credentials, token)
+    runtime_root = app_settings.home / "app"
+    payload = launch_agent_payload(app_settings, runtime_root, Path(uv), credentials, token)
     agent_path = Path.home() / "Library" / "LaunchAgents" / f"{SERVICE_LABEL}.plist"
     serve_command = [tailscale, "serve", "--bg", "--yes", f"http://127.0.0.1:{app_settings.port}"]
     result = {
@@ -108,19 +127,45 @@ def install_macos(
     }
     if dry_run:
         result["plist"] = payload
+        result["runtime"] = str(runtime_root)
         return result
 
     app_settings.ensure_directories()
     (app_settings.home / "logs").mkdir(parents=True, exist_ok=True, mode=0o700)
     agent_path.parent.mkdir(parents=True, exist_ok=True)
+    domain = f"gui/{os.getuid()}"
+    subprocess.run(["launchctl", "bootout", domain, str(agent_path)], capture_output=True)
+
+    backup = app_settings.home / f".app-backup-{uuid4().hex}"
+    had_runtime = runtime_root.exists()
+    if had_runtime:
+        runtime_root.replace(backup)
+    try:
+        _copy_runtime_sources(source_root, runtime_root)
+        subprocess.run([uv, "sync", "--frozen", "--no-dev", "--project", runtime_root], check=True)
+        subprocess.run([bun, "install", "--frozen-lockfile"], cwd=runtime_root / "sidecar", check=True)
+    except Exception:
+        if runtime_root.exists():
+            shutil.rmtree(runtime_root)
+        if had_runtime:
+            backup.replace(runtime_root)
+        raise
+
     temporary = agent_path.with_suffix(".plist.part")
     temporary.write_bytes(plistlib.dumps(payload, sort_keys=True))
     temporary.chmod(0o600)
     temporary.replace(agent_path)
-    domain = f"gui/{os.getuid()}"
-    subprocess.run(["launchctl", "bootout", domain, str(agent_path)], capture_output=True)
-    subprocess.run(["launchctl", "bootstrap", domain, str(agent_path)], check=True)
-    subprocess.run(["launchctl", "enable", f"{domain}/{SERVICE_LABEL}"], check=True)
+    try:
+        subprocess.run(["launchctl", "bootstrap", domain, str(agent_path)], check=True)
+        subprocess.run(["launchctl", "enable", f"{domain}/{SERVICE_LABEL}"], check=True)
+    except Exception:
+        if runtime_root.exists():
+            shutil.rmtree(runtime_root)
+        if had_runtime:
+            backup.replace(runtime_root)
+        raise
+    if had_runtime:
+        shutil.rmtree(backup)
     subprocess.run(serve_command, check=True)
     result["service_status"] = "started"
     return result
