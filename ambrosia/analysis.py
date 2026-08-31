@@ -285,8 +285,9 @@ class HealthAnalysis:
             return f"{delta:.1f} hr {change} than usual"
         return f"{delta:.1f} {metric.unit.split('/')[0]} {change} than usual"
 
-    def home(self, as_of: date | None = None) -> HomeResponse:
-        end = as_of or datetime.now(self.settings.tz).date()
+    def home(self, as_of: date | None = None, now: datetime | None = None) -> HomeResponse:
+        current_time = now.astimezone(self.settings.tz) if now else datetime.now(self.settings.tz)
+        end = as_of or current_time.date()
         keys = ("steps", "sleep_duration", "calories", "weight", "resting_hr", "hrv", "spo2")
         metrics = [self._metric_summary(key, end, 7) for key in keys]
         today_metrics = [
@@ -302,10 +303,12 @@ class HealthAnalysis:
         covered_days = len({point.date for metric in metrics for point in metric.series if point.covered})
         start = end - timedelta(days=6)
         report = self._weekly_report(end, sentence, metrics)
+        sources = self._sources()
         sync = dict(self.db.row(
             "SELECT started_at, finished_at, status, trigger, details FROM sync_runs ORDER BY started_at DESC LIMIT 1"
         ) or {"status": "not_started"})
         sync["configured"] = bool(self.settings.google_credentials and self.settings.google_token)
+        readiness = self._readiness_status(readiness, end, current_time, sync, sources)
         return HomeResponse(
             generated_at=datetime.now(UTC),
             as_of=end,
@@ -313,7 +316,7 @@ class HealthAnalysis:
             metrics=metrics,
             coverage=_coverage(min(covered_days, 7), 7),
             provenance=Provenance(
-                sources=self._sources(), date_start=start, date_end=end, method_version=METHOD_VERSION
+                sources=sources, date_start=start, date_end=end, method_version=METHOD_VERSION
             ),
             report=report,
             sync=sync,
@@ -326,6 +329,44 @@ class HealthAnalysis:
             today_metrics=today_metrics,
             overnight_metrics=overnight_metrics,
         )
+
+    @staticmethod
+    def _readiness_status(
+        readiness: ReadinessScore,
+        day: date,
+        now: datetime,
+        sync: dict,
+        sources: list[str],
+    ) -> ReadinessScore:
+        if readiness.score is not None:
+            return readiness
+        if readiness.baseline_days < 14:
+            return readiness.model_copy(update={"message": "Building your baseline"})
+
+        missing = {"sleep_duration", "hrv", "resting_hr"} - {
+            component.key for component in readiness.components
+        }
+        sleep_missing = "sleep_duration" in missing
+        if day < now.date():
+            message = "No sleep data for that night." if sleep_missing else "Some recovery data is missing for that night."
+        elif day > now.date():
+            message = "No data for this date yet."
+        elif sync.get("status") == "running" or now.hour < 12:
+            message = "Waiting for last night's sleep data." if sleep_missing else "Waiting for last night's recovery data."
+        else:
+            device = HealthAnalysis._wearable_name(sources)
+            missing_text = "No sleep data came through last night." if sleep_missing else "Some recovery data is missing."
+            message = f"{missing_text} Wear your {device} tonight."
+        return readiness.model_copy(update={"message": message})
+
+    @staticmethod
+    def _wearable_name(sources: list[str]) -> str:
+        for source in sources:
+            if source.upper().startswith("FITBIT:") and source.partition(":")[2].strip():
+                return source.partition(":")[2].strip()
+        if any(source.upper().startswith("FITBIT") for source in sources):
+            return "Fitbit"
+        return "tracker"
 
     def _readiness(self, day: date) -> ReadinessScore:
         specifications = (

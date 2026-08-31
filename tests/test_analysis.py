@@ -55,6 +55,29 @@ def test_readiness_waits_for_all_three_personal_baselines(database, app_settings
     assert result.readiness.score is None
     assert result.readiness.label == "unavailable"
     assert result.readiness.baseline_days == 9
+    assert result.readiness.message == "Building your baseline"
+
+
+def test_readiness_waits_for_a_morning_sync(database, app_settings):
+    end = date(2026, 8, 30)
+    seed_days(database, end - timedelta(days=1))
+    morning = datetime(2026, 8, 30, 9, tzinfo=app_settings.tz)
+
+    result = HealthAnalysis(database, app_settings).home(end, now=morning)
+
+    assert result.readiness.message == "Waiting for last night's sleep data."
+
+
+def test_readiness_names_the_wearable_when_sleep_never_arrives(database, app_settings):
+    end = date(2026, 8, 30)
+    seed_days(database, end - timedelta(days=1))
+    evening = datetime(2026, 8, 30, 20, tzinfo=app_settings.tz)
+
+    result = HealthAnalysis(database, app_settings).home(end, now=evening)
+
+    assert result.readiness.message == (
+        "No sleep data came through last night. Wear your Charge 6 tonight."
+    )
 
 
 def test_baseline_withholds_conclusion_under_14_days(database, app_settings):

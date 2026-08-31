@@ -122,7 +122,7 @@ function ReadinessPanel({ readiness }: { readiness: ReadinessScore }) {
     return (
       <section className="readiness-panel readiness-panel--empty" aria-labelledby="readiness-title">
         <p>Readiness</p>
-        <h2 id="readiness-title">{readiness.baseline_days < 14 ? "Building your baseline" : "Waiting for last night’s data"}</h2>
+        <h2 id="readiness-title">{readiness.message}</h2>
       </section>
     );
   }

@@ -4,7 +4,9 @@ test("dashboard navigates every domain without horizontal overflow", async ({ pa
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Daily readiness" }).getByRole("button")).toHaveCount(7);
-  await expect(page.getByRole("heading", { name: "Waiting for last night’s data" })).toBeVisible();
+  await expect(page.locator(".readiness-panel--empty h2")).toHaveText(
+    /Building your baseline|Waiting for last night's sleep data|No sleep data came through last night/,
+  );
   await expect(page.getByRole("button", { name: "Summarize with AI" })).toBeVisible();
   await expect(page.locator(".daily-metrics article")).toHaveCount(11);
   await expect(page.getByText(/Past weeks/)).toBeVisible();
