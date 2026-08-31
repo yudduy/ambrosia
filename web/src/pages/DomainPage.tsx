@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { Domain, RangeName } from "../lib/types";
-import { CoverageBanner } from "../components/CoverageBanner";
 import { MetricCard } from "../components/MetricCard";
 import { RangeSwitch } from "../components/RangeSwitch";
 import { TrendChart } from "../components/TrendChart";
@@ -27,7 +26,6 @@ export function DomainPage({ domain }: { domain: Exclude<Domain, "nutrition"> })
         <div><h1>{title}</h1><p className="page-summary">{data.summary}</p></div>
         <RangeSwitch value={range} onChange={(next) => { setRange(next); setSelected(0); }} />
       </section>
-      <CoverageBanner coverage={data.coverage} />
       <section className="trend-section">
         <div className="trend-section__header">
           <h2>{selectedMetric?.label ?? title}</h2>

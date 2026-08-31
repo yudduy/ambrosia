@@ -6,7 +6,9 @@ import { RangeSwitch } from "./RangeSwitch";
 test("announces and changes the selected range", () => {
   const onChange = vi.fn();
   render(<RangeSwitch value="28d" onChange={onChange} />);
-  expect(screen.getByRole("button", { name: "4 weeks" })).toHaveAttribute("aria-pressed", "true");
-  fireEvent.click(screen.getByRole("button", { name: "7 days" }));
+  const range = screen.getByRole("combobox", { name: "Date range" });
+  expect(range).toHaveTextContent("4 weeks");
+  fireEvent.click(range);
+  fireEvent.click(screen.getByRole("option", { name: "Week" }));
   expect(onChange).toHaveBeenCalledWith("7d");
 });

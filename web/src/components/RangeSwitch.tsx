@@ -1,20 +1,28 @@
+import { Dropdown } from "@carbon/react";
 import type { RangeName } from "../lib/types";
 
+const ranges: Array<{ id: RangeName; label: string }> = [
+  { id: "7d", label: "Week" },
+  { id: "28d", label: "4 weeks" },
+  { id: "90d", label: "3 months" },
+];
+
 export function RangeSwitch({ value, onChange }: { value: RangeName; onChange: (value: RangeName) => void }) {
-  const labels: Record<RangeName, string> = { "7d": "7 days", "28d": "4 weeks", "90d": "3 months" };
   return (
-    <div className="range-switch" role="group" aria-label="Date range">
-      {(["7d", "28d", "90d"] as RangeName[]).map((range) => (
-        <button
-          type="button"
-          key={range}
-          className={range === value ? "active" : ""}
-          aria-pressed={range === value}
-          onClick={() => onChange(range)}
-        >
-          {labels[range]}
-        </button>
-      ))}
+    <div className="range-switch">
+      <Dropdown
+        id="date-range"
+        aria-label="Date range"
+        titleText="Date range"
+        hideLabel
+        label="Choose range"
+        items={ranges}
+        itemToString={(item) => item?.label ?? ""}
+        selectedItem={ranges.find((range) => range.id === value)}
+        size="sm"
+        autoAlign
+        onChange={({ selectedItem }) => selectedItem && onChange(selectedItem.id)}
+      />
     </div>
   );
 }

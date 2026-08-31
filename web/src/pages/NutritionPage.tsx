@@ -4,7 +4,6 @@ import { Button, FileUploaderDropContainer, InlineLoading, TextInput } from "@ca
 import { Checkmark, TrashCan } from "@carbon/icons-react";
 import { api } from "../lib/api";
 import type { MealAnalysis, NutritionDraft, NutritionRange, RangeName } from "../lib/types";
-import { CoverageBanner } from "../components/CoverageBanner";
 import { MetricCard } from "../components/MetricCard";
 import { RangeSwitch } from "../components/RangeSwitch";
 import { TrendChart } from "../components/TrendChart";
@@ -56,7 +55,6 @@ export function NutritionPage() {
         <div><h1>Nutrition</h1>{data.coverage.covered_days > 0 && <p className="page-summary">{data.summary}</p>}</div>
         <RangeSwitch value={range} onChange={setRange} />
       </section>
-      <CoverageBanner coverage={data.coverage} />
       <section className="meal-capture">
         <div className="meal-capture__copy">
           <h2>Add meal</h2>
