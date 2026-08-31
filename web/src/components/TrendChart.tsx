@@ -7,7 +7,7 @@ export function TrendChart({ metric }: { metric: MetricSummary | undefined }) {
     return (
       <div className="chart-empty">
         <span className="chart-empty__line" />
-        <p>No covered values in this period.</p>
+        <p>No data for this period.</p>
       </div>
     );
   }

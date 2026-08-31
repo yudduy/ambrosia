@@ -16,7 +16,7 @@ const metric: MetricSummary = {
     difference_percent: 7.9,
     baseline_days: 28,
     direction: "within",
-    description: "Within your recent personal range.",
+    description: "Usual range",
   },
   series: [
     { date: "2026-08-28", value: 8000, covered: true },
@@ -27,14 +27,17 @@ const metric: MetricSummary = {
     expected_days: 2,
     ratio: 1,
     complete: true,
-    message: "All 2 days are covered.",
+    message: "2/2 days",
   },
 };
 
-test("renders the value, personal comparison, and coverage", () => {
+test("renders the value without repeating a usual-range comparison", () => {
   render(<MetricCard metric={metric} />);
   expect(screen.getByText("8,420")).toBeInTheDocument();
-  expect(screen.getByText("Within your recent personal range.")).toBeInTheDocument();
-  expect(screen.getByLabelText("All 2 days are covered.")).toBeInTheDocument();
+  expect(screen.queryByText("Usual range")).not.toBeInTheDocument();
 });
 
+test("keeps a meaningful change", () => {
+  render(<MetricCard metric={{ ...metric, comparison: { ...metric.comparison, description: "620 more than usual" } }} />);
+  expect(screen.getByText("620 more than usual")).toBeInTheDocument();
+});

@@ -7,11 +7,11 @@ import { HomePage } from "./pages/HomePage";
 import { DomainPage } from "./pages/DomainPage";
 import { NutritionPage } from "./pages/NutritionPage";
 
-const navigation: Array<[string, string, ComponentType<{ size?: number }>, string]> = [
-  ["Home", "/", Home, "Your week"],
-  ["Fitness", "/fitness", Activity, "Movement"],
-  ["Sleep", "/sleep", Asleep, "Nights"],
-  ["Nutrition", "/nutrition", Restaurant, "Meals"],
+const navigation: Array<[string, string, ComponentType<{ size?: number }>]> = [
+  ["Home", "/", Home],
+  ["Fitness", "/fitness", Activity],
+  ["Sleep", "/sleep", Asleep],
+  ["Nutrition", "/nutrition", Restaurant],
 ];
 
 export function App() {
@@ -25,30 +25,29 @@ export function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><span className="brand__mark">A</span><span><strong>Ambrosia</strong><small>Personal health</small></span></div>
+        <div className="brand"><span className="brand__mark">A</span><strong>Ambrosia</strong></div>
         <nav aria-label="Primary navigation">
-          {navigation.map(([label, path, Icon, sublabel]) => (
+          {navigation.map(([label, path, Icon]) => (
             <NavLink key={path} to={path} end={path === "/"} className={({ isActive }) => isActive ? "active" : ""}>
-              <Icon size={20} /><span><strong>{label}</strong><small>{sublabel}</small></span>
+              <Icon size={19} /><span>{label}</span>
             </NavLink>
           ))}
         </nav>
         <div className="sidebar__bottom">
           <button onClick={() => setProfileOpen(true)}><UserAvatar size={20} /><span>Profile</span></button>
           <button onClick={() => setDark((value) => !value)} aria-label={dark ? "Use light mode" : "Use dark mode"}>{dark ? <Sun size={20} /> : <Moon size={20} />}<span>{dark ? "Light" : "Dark"}</span></button>
-          <div className="private-state"><span className="status-dot status-dot--success" /><span><strong>Private</strong><small>Mac mini · local</small></span></div>
         </div>
       </aside>
       <header className="mobile-header"><div className="brand"><span className="brand__mark">A</span><strong>Ambrosia</strong></div><div><button className="icon-button" onClick={() => setDark((value) => !value)} aria-label="Toggle color theme">{dark ? <Sun size={20} /> : <Moon size={20} />}</button><button className="icon-button" onClick={() => setProfileOpen(true)} aria-label="Open profile"><UserAvatar size={20} /></button></div></header>
       <main id="main-content">
         <Routes>
-          <Route path="/" element={<HomePage openAssistant={() => setAssistantOpen(true)} />} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/fitness" element={<DomainPage domain="fitness" />} />
           <Route path="/sleep" element={<DomainPage domain="sleep" />} />
           <Route path="/nutrition" element={<NutritionPage />} />
         </Routes>
       </main>
-      <button className="ask-fab" onClick={() => setAssistantOpen(true)}><Chat size={20} /><span>Ask Ambrosia</span></button>
+      <button className="ask-fab" aria-label="Ask Ambrosia" onClick={() => setAssistantOpen(true)}><Chat size={20} /><span>Ask</span></button>
       <nav className="bottom-nav" aria-label="Primary navigation">
         {navigation.map(([label, path, Icon]) => <NavLink key={path} to={path} end={path === "/"}><Icon size={20} /><span>{label}</span></NavLink>)}
       </nav>
@@ -58,4 +57,3 @@ export function App() {
     </div>
   );
 }
-

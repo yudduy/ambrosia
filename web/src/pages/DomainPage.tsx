@@ -8,19 +8,14 @@ import { RangeSwitch } from "../components/RangeSwitch";
 import { TrendChart } from "../components/TrendChart";
 import { PageError, PageLoading } from "./HomePage";
 
-const copy = {
-  fitness: { eyebrow: "Training and movement", title: "Fitness", description: "Movement and sessions, described against your own recent pattern." },
-  sleep: { eyebrow: "Nights and recovery", title: "Sleep", description: "Coverage comes first. Conclusions stay personal, without population ranges." },
-};
-
 export function DomainPage({ domain }: { domain: Exclude<Domain, "nutrition"> }) {
   const [range, setRange] = useState<RangeName>("28d");
   const [selected, setSelected] = useState(0);
   const query = useQuery({ queryKey: [domain, range], queryFn: () => api.domain(domain, range) });
-  if (query.isLoading) return <PageLoading label={`Building your ${domain} view`} />;
+  if (query.isLoading) return <PageLoading label={domain} />;
   if (query.error || !query.data) return <PageError message={query.error?.message} retry={() => query.refetch()} />;
   const { data } = query;
-  const content = copy[domain];
+  const title = domain === "fitness" ? "Fitness" : "Sleep";
   const selectedMetric = data.metrics[selected] ?? data.metrics[0];
   const latestNight = domain === "sleep" ? data.details.selected_night as Record<string, unknown> | null : null;
   const timing = latestNight?.timing as Record<string, number | string> | undefined;
@@ -29,14 +24,13 @@ export function DomainPage({ domain }: { domain: Exclude<Domain, "nutrition"> })
   return (
     <div className="page domain-page">
       <section className="page-intro">
-        <div><p className="eyebrow">{content.eyebrow}</p><h1>{content.title}</h1><p>{content.description}</p></div>
+        <div><h1>{title}</h1><p className="page-summary">{data.summary}</p></div>
         <RangeSwitch value={range} onChange={(next) => { setRange(next); setSelected(0); }} />
       </section>
-      <CoverageBanner coverage={data.coverage} provenance={data.provenance} />
-      <section className="insight-band"><span>Current read</span><h2>{data.summary}</h2></section>
+      <CoverageBanner coverage={data.coverage} />
       <section className="trend-section">
         <div className="trend-section__header">
-          <div><p className="eyebrow">Daily view</p><h2>{selectedMetric?.label ?? content.title}</h2></div>
+          <h2>{selectedMetric?.label ?? title}</h2>
           <div className="metric-tabs" role="tablist" aria-label={`${domain} metric`}>
             {data.metrics.map((metric, index) => (
               <button key={metric.key} role="tab" aria-selected={selected === index} className={selected === index ? "active" : ""} onClick={() => setSelected(index)}>{metric.label}</button>
@@ -50,7 +44,7 @@ export function DomainPage({ domain }: { domain: Exclude<Domain, "nutrition"> })
       </section>
       {domain === "sleep" && (
         <section className="detail-card">
-          <div><p className="eyebrow">Most recent covered night</p><h2>{latestNight ? `${((Number(latestNight.duration_minutes) || 0) / 60).toFixed(1)} hours` : "No covered night"}</h2></div>
+          <div className="detail-card__heading"><h2>Last night</h2><strong>{latestNight ? `${((Number(latestNight.duration_minutes) || 0) / 60).toFixed(1)} hr` : "No data"}</strong></div>
           {latestNight ? (
             <div className="sleep-detail-content">
               <div className="stage-grid">
@@ -59,25 +53,30 @@ export function DomainPage({ domain }: { domain: Exclude<Domain, "nutrition"> })
                 ))}
               </div>
               <div className="sleep-context-grid">
-                <div><span>Bedtime</span><strong>{timing ? new Date(String(timing.bedtime)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}</strong><small>{timing ? `${timing.bedtime_difference_minutes} min from 28-night median` : "No timing baseline"}</small></div>
-                <div><span>Wake time</span><strong>{timing ? new Date(String(timing.wake_time)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}</strong><small>{timing ? `${timing.wake_difference_minutes} min from 28-night median` : "No timing baseline"}</small></div>
-                <div><span>Overnight heart rate</span><strong>{overnightHeartRate.length ? `${Math.round(Math.min(...overnightHeartRate.map((item) => item.value)))}–${Math.round(Math.max(...overnightHeartRate.map((item) => item.value)))} bpm` : "No coverage"}</strong><small>{overnightHeartRate.length ? `${overnightHeartRate.length} five-minute medians` : "Raw samples stay local"}</small></div>
+                <div><span>Bedtime</span><strong>{timing ? new Date(String(timing.bedtime)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "-"}</strong><small>{timing ? timingDifference(Number(timing.bedtime_difference_minutes)) : "No comparison"}</small></div>
+                <div><span>Wake time</span><strong>{timing ? new Date(String(timing.wake_time)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "-"}</strong><small>{timing ? timingDifference(Number(timing.wake_difference_minutes)) : "No comparison"}</small></div>
+                <div><span>Heart rate</span><strong>{overnightHeartRate.length ? `${Math.round(Math.min(...overnightHeartRate.map((item) => item.value)))}-${Math.round(Math.max(...overnightHeartRate.map((item) => item.value)))} bpm` : "No data"}</strong></div>
               </div>
             </div>
-          ) : <p>Sleep stages appear only when the wearable supplies a complete session.</p>}
+          ) : <p>No sleep data for this period.</p>}
         </section>
       )}
       {domain === "fitness" && (
         <section className="detail-card sessions-card">
-          <div><p className="eyebrow">Workout history</p><h2>Recent sessions</h2></div>
+          <h2>Workouts</h2>
           <div className="session-list">
             {sessions.length ? sessions.slice(0, 6).map((session) => {
               const details = session.details as Record<string, unknown>;
-              return <div key={String(session.id)}><span><strong>{String(session.title)}</strong><small>{new Date(String(session.start_at)).toLocaleDateString()}</small></span><span>{Math.round(Number(session.duration_minutes))} min<small>{details.active_zone_minutes ? `${details.active_zone_minutes} zone min` : "covered session"}</small></span></div>;
-            }) : <p>No workout sessions are available in this period.</p>}
+              return <div key={String(session.id)}><span><strong>{String(session.title)}</strong><small>{new Date(String(session.start_at)).toLocaleDateString()}</small></span><span>{Math.round(Number(session.duration_minutes))} min{details.active_zone_minutes ? <small>{`${details.active_zone_minutes} zone min`}</small> : null}</span></div>;
+            }) : <p>No workouts in this period.</p>}
           </div>
         </section>
       )}
     </div>
   );
+}
+
+function timingDifference(value: number) {
+  if (!Number.isFinite(value) || value === 0) return "Usual time";
+  return `${Math.abs(Math.round(value))} min ${value > 0 ? "later" : "earlier"} than usual`;
 }

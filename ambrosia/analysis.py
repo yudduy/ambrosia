@@ -78,7 +78,7 @@ METRICS: dict[str, MetricDefinition] = {
     ),
     "weight": MetricDefinition("weight", "Weight", "weight", "lb", "sample", "median", "median", 0.0022046226),
     "calories": MetricDefinition(
-        "calories", "Logged calories", "nutrition", "kcal/day", "nutrition", "sum", "mean"
+        "calories", "Calories", "nutrition", "kcal/day", "nutrition", "sum", "mean"
     ),
     "protein": MetricDefinition(
         "protein", "Protein", "nutrition", "g/day", "nutrition", "sum", "mean"
@@ -113,11 +113,11 @@ def _coverage(covered: int, expected: int, label: str = "days") -> Coverage:
     ratio = covered / expected if expected else 0
     complete = covered == expected
     if complete:
-        message = f"All {expected} {label} are covered."
+        message = f"{covered}/{expected} {label}"
     elif covered == 0:
-        message = f"No covered {label} in this period."
+        message = "No data"
     else:
-        message = f"{covered} of {expected} {label} are covered; conclusions are limited."
+        message = f"{covered}/{expected} {label}"
     return Coverage(
         covered_days=covered,
         expected_days=expected,
@@ -228,10 +228,10 @@ class HealthAnalysis:
         )
         if recent_value is None:
             direction = "unavailable"
-            description = "No covered data in this period."
+            description = "No data"
         elif baseline_median is None:
             direction = "unavailable"
-            description = f"A personal baseline needs 14 covered days; {len(baseline_values)} are available."
+            description = f"{len(baseline_values)}/14 days needed"
         elif baseline_p10 is not None and recent_value < baseline_p10:
             direction = "below"
             description = self._difference_text(definition, recent_value, baseline_median, "below")
@@ -240,7 +240,7 @@ class HealthAnalysis:
             description = self._difference_text(definition, recent_value, baseline_median, "above")
         else:
             direction = "within"
-            description = "Within your recent personal range."
+            description = "Usual range"
         series = [
             SeriesPoint(date=recent_start + timedelta(days=index), value=recent.get(recent_start + timedelta(days=index)), covered=(recent_start + timedelta(days=index)) in recent)
             for index in range(days)
@@ -268,11 +268,12 @@ class HealthAnalysis:
     @staticmethod
     def _difference_text(metric: MetricDefinition, value: float, baseline: float, direction: str) -> str:
         delta = abs(value - baseline)
+        change = "more" if direction == "above" else "less"
         if metric.key == "workouts":
-            return f"{value:.0f} workouts, {delta:.1f} {direction} your recent average."
+            return f"{delta:.1f} workouts {change} than usual"
         if metric.unit.startswith("hr"):
-            return f"{delta:.1f} hours {direction} your recent median."
-        return f"{delta:.1f} {metric.unit.split('/')[0]} {direction} your recent median."
+            return f"{delta:.1f} hr {change} than usual"
+        return f"{delta:.1f} {metric.unit.split('/')[0]} {change} than usual"
 
     def home(self, as_of: date | None = None) -> HomeResponse:
         end = as_of or datetime.now(self.settings.tz).date()
@@ -301,12 +302,15 @@ class HealthAnalysis:
     def _sentence(self, metrics: list[MetricSummary]) -> str:
         available = [metric for metric in metrics if metric.comparison.direction != "unavailable"]
         if not available:
-            return "Your first personal baseline is still forming; Ambrosia will compare trends after 14 covered days."
+            return "More data is needed before comparisons appear."
         notable = [metric for metric in available if metric.comparison.direction in ("above", "below")]
         if not notable:
-            return "Your last seven days were broadly within your recent personal range across the covered signals."
-        fragments = [f"{metric.label.lower()} was {metric.comparison.direction}" for metric in notable[:2]]
-        return "Over the last seven days, " + " while ".join(fragments) + " your recent personal range."
+            return "Similar to your last four weeks."
+        fragments = [
+            f"{metric.label} was {'higher' if metric.comparison.direction == 'above' else 'lower'} than usual."
+            for metric in notable[:2]
+        ]
+        return " ".join(fragments)
 
     def domain(self, domain: Literal["fitness", "sleep", "nutrition"], range_name: RangeName) -> DomainResponse:
         days = {"7d": 7, "28d": 28, "90d": 90}[range_name]
@@ -341,13 +345,14 @@ class HealthAnalysis:
     def _domain_sentence(domain: str, metrics: list[MetricSummary]) -> str:
         available = [metric for metric in metrics if metric.value is not None]
         if not available:
-            return f"No covered {domain} data is available for this period."
+            return f"No {domain} data for this period."
         notable = next(
             (metric for metric in available if metric.comparison.direction in ("above", "below")), None
         )
         if notable:
-            return f"{notable.label} is {notable.comparison.direction} your recent personal range."
-        return f"Covered {domain} signals are within your recent personal range."
+            change = "higher" if notable.comparison.direction == "above" else "lower"
+            return f"{notable.label} was {change} than usual."
+        return "Similar to your last four weeks."
 
     def _latest_sleep(self) -> dict | None:
         rows = self.db.rows(

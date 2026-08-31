@@ -1,7 +1,7 @@
 import type { MetricSummary } from "../lib/types";
 
 function number(value: number | null, unit: string) {
-  if (value === null) return "—";
+  if (value === null) return "-";
   if (unit === "sessions" || Math.abs(value) >= 100) return Math.round(value).toLocaleString();
   return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
 }
@@ -29,24 +29,17 @@ function Sparkline({ metric }: { metric: MetricSummary }) {
 }
 
 export function MetricCard({ metric, compact = false }: { metric: MetricSummary; compact?: boolean }) {
-  const direction = metric.comparison.direction;
+  const showComparison = metric.value !== null && metric.comparison.description !== "Usual range";
   return (
     <article className={`metric-card ${compact ? "metric-card--compact" : ""}`}>
       <div className="metric-card__topline">
         <span>{metric.label}</span>
-        <span className={`direction direction--${direction}`}>
-          {direction === "unavailable" ? "forming baseline" : direction}
-        </span>
       </div>
       <div className="metric-card__value">
         {number(metric.value, metric.unit)} <small>{metric.unit}</small>
       </div>
-      <Sparkline metric={metric} />
-      <p className="metric-card__description">{metric.comparison.description}</p>
-      <div className="metric-card__coverage" aria-label={metric.coverage.message}>
-        <span style={{ width: `${metric.coverage.ratio * 100}%` }} />
-      </div>
+      {!compact && <Sparkline metric={metric} />}
+      {!compact && showComparison && <p className="metric-card__description">{metric.comparison.description}</p>}
     </article>
   );
 }
-

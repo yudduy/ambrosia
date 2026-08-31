@@ -11,7 +11,6 @@ test("requires disclosure before requesting assistant status", () => {
       <AskDrawer open onClose={() => undefined} />
     </QueryClientProvider>,
   );
-  expect(screen.getByRole("heading", { name: "Your dashboard stays local until you ask." })).toBeInTheDocument();
-  expect(screen.getByText(/Routine sync, comparisons, and weekly reports remain on this Mac/)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Before you start" })).toBeInTheDocument();
+  expect(screen.getByText(/Everything else stays on this Mac/)).toBeInTheDocument();
 });
-

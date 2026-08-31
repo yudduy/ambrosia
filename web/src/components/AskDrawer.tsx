@@ -54,7 +54,7 @@ export function AskDrawer({ open, onClose }: { open: boolean; onClose: () => voi
     source.addEventListener("turn_completed", (event) => {
       const value = JSON.parse((event as MessageEvent).data) as { status: string; error?: unknown };
       setSending(false);
-      if (value.status !== "completed") setError("The AI turn did not complete. Your dashboard data was not changed.");
+      if (value.status !== "completed") setError("AI stopped. Nothing was saved.");
     });
     source.onerror = () => setSending(false);
     return new Promise<void>((resolve, reject) => {
@@ -99,37 +99,32 @@ export function AskDrawer({ open, onClose }: { open: boolean; onClose: () => voi
       </header>
       {!accepted ? (
         <div className="disclosure">
-          <p className="eyebrow">Before the first conversation</p>
-          <h2>Your dashboard stays local until you ask.</h2>
-          <p>When AI is invoked, selected health summaries, your message, and any meal image you choose are sent to OpenAI through your ChatGPT account.</p>
-          <p>Routine sync, comparisons, and weekly reports remain on this Mac.</p>
+          <h2>Before you start</h2>
+          <p>Your question, the health totals needed to answer it, and any meal photo you analyze are sent to OpenAI. Everything else stays on this Mac.</p>
           <Checkbox
             id="ai-disclosure"
-            labelText="I understand what is sent when I use AI"
+            labelText="I understand"
             checked={accepted}
             onChange={(_, state) => acceptDisclosure(Boolean(state.checked))}
           />
         </div>
       ) : status.isLoading ? (
-        <InlineLoading description="Checking private AI connection" />
+        <InlineLoading description="Connecting..." />
       ) : !status.data?.authenticated ? (
         <div className="assistant-login">
-          <p className="eyebrow">ChatGPT connection</p>
-          <h2>Sign in once on this Mac.</h2>
-          <p>{status.data?.reason ?? "Ambrosia uses Codex app-server so it does not store an OpenAI API key."}</p>
+          <h2>Connect ChatGPT</h2>
+          <p>Sign in with the ChatGPT account you want to use.</p>
           <Button renderIcon={Login} onClick={login}>Sign in with ChatGPT</Button>
-          <button className="text-button" onClick={() => status.refetch()}>I finished signing in</button>
+          <button className="text-button" onClick={() => status.refetch()}>Check again</button>
         </div>
       ) : (
         <>
           <div className="messages" aria-live="polite">
             {messages.length === 0 && (
               <div className="assistant-intro">
-                <span className="assistant-mark">A</span>
-                <h2>Ask about what changed.</h2>
-                <p>I can inspect the same covered summaries you see here—never unrestricted health records.</p>
+                <h2>Ask a question</h2>
                 <div className="prompt-chips">
-                  {["Why is my HRV lower?", "Help me plan this week", "Could sodium explain how I feel?"].map((prompt) => (
+                  {["Why is my HRV lower?", "Plan my week", "Could sodium affect how I feel?"].map((prompt) => (
                     <button key={prompt} onClick={() => setDraft(prompt)}>{prompt}</button>
                   ))}
                 </div>
@@ -141,7 +136,7 @@ export function AskDrawer({ open, onClose }: { open: boolean; onClose: () => voi
                 <p>{message.text}</p>
               </div>
             ))}
-            {sending && <InlineLoading description="Looking at covered evidence" />}
+            {sending && <InlineLoading description="Thinking..." />}
             <div ref={endRef} />
           </div>
           <div className="composer">
@@ -149,7 +144,7 @@ export function AskDrawer({ open, onClose }: { open: boolean; onClose: () => voi
               id="assistant-message"
               labelText="Question"
               hideLabel
-              placeholder="Ask about sleep, training, nutrition, or recovery…"
+              placeholder="Ask about sleep, fitness, or food"
               value={draft}
               rows={3}
               onChange={(event) => setDraft(event.target.value)}
@@ -165,7 +160,7 @@ export function AskDrawer({ open, onClose }: { open: boolean; onClose: () => voi
         </>
       )}
       {error && <div className="drawer-error" role="alert">{error}</div>}
-      <footer className="ask-drawer__footer">Exploratory guidance · not medical advice</footer>
+      <footer className="ask-drawer__footer">Not medical advice</footer>
     </aside>
   );
 }

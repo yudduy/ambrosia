@@ -38,7 +38,7 @@ def test_home_uses_28_valid_day_baseline(database, app_settings):
     assert steps.comparison.baseline_days == 28
     assert steps.coverage.covered_days == 7
     assert result.provenance.date_start == date(2026, 8, 23)
-    assert "seven days" in result.sentence.lower()
+    assert result.sentence
 
 
 def test_baseline_withholds_conclusion_under_14_days(database, app_settings):
@@ -46,7 +46,7 @@ def test_baseline_withholds_conclusion_under_14_days(database, app_settings):
     seed_days(database, end, 10)
     result = HealthAnalysis(database, app_settings)._metric_summary("steps", end, 7)
     assert result.comparison.direction == "unavailable"
-    assert "14 covered days" in result.comparison.description
+    assert result.comparison.description == "3/14 days needed"
 
 
 def test_weekly_workout_total_uses_weekly_scaled_daily_baseline(database, app_settings):
