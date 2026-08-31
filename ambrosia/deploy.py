@@ -52,6 +52,7 @@ def launch_agent_payload(
         ],
         "WorkingDirectory": str(project_root),
         "EnvironmentVariables": {
+            "HOME": str(Path.home()),
             "AMBROSIA_HOME": str(app_settings.home),
             "AMBROSIA_GOOGLE_CREDENTIALS": str(credentials),
             "AMBROSIA_GOOGLE_TOKEN": str(token),
