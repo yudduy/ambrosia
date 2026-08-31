@@ -38,12 +38,7 @@ def launch_agent_payload(
     return {
         "Label": SERVICE_LABEL,
         "ProgramArguments": [
-            str(uv_path),
-            "run",
-            "--frozen",
-            "--project",
-            str(project_root),
-            "ambrosia",
+            str(project_root / ".venv" / "bin" / "ambrosia"),
             "serve",
             "--host",
             "127.0.0.1",
@@ -95,6 +90,9 @@ def install_macos(
     if not tailscale:
         raise DeploymentError("Tailscale is not installed or is not on PATH.")
     project_root = Path(__file__).resolve().parents[1]
+    runtime = project_root / ".venv" / "bin" / "ambrosia"
+    if not runtime.is_file():
+        raise DeploymentError("Run `uv sync --frozen` before installing the service.")
     frontend = project_root / "web" / "dist" / "index.html"
     if not frontend.is_file():
         raise DeploymentError("Build the frontend before installing the service.")
