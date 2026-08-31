@@ -23,7 +23,7 @@ export function DomainPage({ domain }: { domain: Exclude<Domain, "nutrition"> })
   return (
     <div className="page domain-page">
       <section className="page-intro">
-        <div><h1>{title}</h1><p className="page-summary">{data.summary}</p></div>
+        <div><h1>{title}</h1></div>
         <RangeSwitch value={range} onChange={(next) => { setRange(next); setSelected(0); }} />
       </section>
       <section className="trend-section">
