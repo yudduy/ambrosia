@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, FileUploaderDropContainer, InlineLoading, TextInput } from "@carbon/react";
-import { Checkmark, TrashCan } from "@carbon/icons-react";
+import { Button, FileUploaderButton, InlineLoading, TextInput } from "@carbon/react";
+import { Checkmark, Image, Send, TrashCan } from "@carbon/icons-react";
 import { api } from "../lib/api";
 import type { MealAnalysis, NutritionDraft, NutritionRange, RangeName } from "../lib/types";
 import { MetricCard } from "../components/MetricCard";
@@ -16,13 +16,19 @@ export function NutritionPage() {
   const [draft, setDraft] = useState<NutritionDraft>();
   const [error, setError] = useState<string>();
   const [selectedFile, setSelectedFile] = useState<File>();
+  const [previewUrl, setPreviewUrl] = useState<string>();
   const query = useQuery({ queryKey: ["nutrition", range], queryFn: () => api.domain("nutrition", range) });
-  const upload = useMutation({
-    mutationFn: () => api.uploadMeal(selectedFile!, note),
+  const submit = useMutation({
+    mutationFn: async () => {
+      const uploaded = await api.uploadMeal(selectedFile!, note);
+      setDraft(uploaded);
+      setPreviewUrl(undefined);
+      return api.analyzeMeal(uploaded.id);
+    },
     onSuccess: setDraft,
     onError: (reason) => setError(reason.message),
   });
-  const analyze = useMutation({
+  const retry = useMutation({
     mutationFn: () => api.analyzeMeal(draft!.id),
     onSuccess: setDraft,
     onError: (reason) => setError(reason.message),
@@ -33,17 +39,31 @@ export function NutritionPage() {
       setDraft(undefined);
       setNote("");
       setSelectedFile(undefined);
+      setPreviewUrl(undefined);
       void queryClient.invalidateQueries({ queryKey: ["nutrition"] });
       void queryClient.invalidateQueries({ queryKey: ["home"] });
     },
     onError: (reason) => setError(reason.message),
   });
 
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  function choosePhoto(file?: File) {
+    if (!file) return;
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    setError(undefined);
+  }
+
   async function discard() {
     if (draft) await api.discardMeal(draft.id);
     setDraft(undefined);
     setNote("");
     setSelectedFile(undefined);
+    setPreviewUrl(undefined);
+    setError(undefined);
   }
 
   if (query.isLoading) return <PageLoading label="nutrition" />;
@@ -55,40 +75,66 @@ export function NutritionPage() {
         <div><h1>Nutrition</h1>{data.coverage.covered_days > 0 && <p className="page-summary">{data.summary}</p>}</div>
         <RangeSwitch value={range} onChange={setRange} />
       </section>
-      <section className="meal-capture">
-        <div className="meal-capture__copy">
-          <h2>Add meal</h2>
-          <p>The photo stays on this Mac until you tap Analyze.</p>
-        </div>
-        {!draft ? (
-          <div className="meal-uploader">
-            <FileUploaderDropContainer
-              accept={["image/jpeg", "image/png", "image/webp", "image/heic"]}
-              labelText="Choose a meal photo"
-              multiple={false}
-              onAddFiles={(_, { addedFiles }) => { setSelectedFile(addedFiles[0]); setError(undefined); }}
-            />
-            {selectedFile && <p className="selected-file">{selectedFile.name}</p>}
-            <TextInput id="meal-note" labelText="Note (optional)" placeholder="Chicken bowl after the gym" value={note} onChange={(event) => setNote(event.target.value)} />
-            <Button disabled={!selectedFile || upload.isPending} onClick={() => upload.mutate()}>{upload.isPending ? "Adding..." : "Add photo"}</Button>
-          </div>
-        ) : (
-          <div className="meal-draft">
-            <img src={draft.thumbnail_url} alt="Meal photo" />
-            <div className="meal-draft__body">
-              {draft.status === "uploaded" || draft.status === "failed" ? (
-                <>
-                  <h3>Ready to analyze</h3>
-                  <p>Analyze sends this photo{draft.note ? ` and the note "${draft.note}"` : ""} to ChatGPT.</p>
-                  <div className="meal-actions"><Button onClick={() => analyze.mutate()} disabled={analyze.isPending}>{analyze.isPending ? "Analyzing..." : "Analyze"}</Button><Button kind="ghost" renderIcon={TrashCan} onClick={discard}>Discard</Button></div>
-                </>
-              ) : draft.status === "analyzing" ? <InlineLoading description="Analyzing photo..." /> : draft.analysis ? (
-                <MealEditor analysis={draft.analysis} onChange={(analysis) => setDraft({ ...draft, analysis })} />
-              ) : null}
+      <section className="meal-analyzer" aria-labelledby="meal-analyzer-title">
+        <div className="meal-thread" aria-live="polite">
+          {!draft ? (
+            <div className="meal-thread__empty">
+              <Image size={22} aria-hidden="true" />
+              <h2 id="meal-analyzer-title">Analyze a meal</h2>
+              <p>Add a photo. Ambrosia will estimate calories and macros.</p>
             </div>
-            {draft.status === "ready" && (
-              <div className="meal-confirm-bar"><Button kind="ghost" renderIcon={TrashCan} onClick={discard}>Discard</Button><Button renderIcon={Checkmark} onClick={() => confirm.mutate()} disabled={confirm.isPending}>{confirm.isPending ? "Saving..." : "Save meal"}</Button></div>
+          ) : (
+            <>
+              <article className="meal-turn meal-turn--photo">
+                <img src={draft.thumbnail_url} alt="Meal submitted for analysis" />
+                {draft.note && <p>{draft.note}</p>}
+              </article>
+              {(submit.isPending || retry.isPending || draft.status === "analyzing") ? (
+                <article className="meal-turn meal-turn--reply"><InlineLoading description="Analyzing meal..." /></article>
+              ) : draft.analysis ? (
+                <article className="meal-turn meal-turn--reply">
+                  <h3>Estimate</h3>
+                  <MealEditor analysis={draft.analysis} onChange={(analysis) => setDraft({ ...draft, analysis })} />
+                  <div className="meal-reply-actions">
+                    <Button kind="ghost" renderIcon={TrashCan} onClick={discard}>Discard</Button>
+                    <Button renderIcon={Checkmark} onClick={() => confirm.mutate()} disabled={confirm.isPending}>{confirm.isPending ? "Saving..." : "Save meal"}</Button>
+                  </div>
+                </article>
+              ) : (
+                <article className="meal-turn meal-turn--reply">
+                  <h3>Analysis stopped</h3>
+                  <p>Try again or discard this photo.</p>
+                  <div className="meal-reply-actions">
+                    <Button kind="ghost" renderIcon={TrashCan} onClick={discard}>Discard</Button>
+                    <Button onClick={() => retry.mutate()} disabled={retry.isPending}>Try again</Button>
+                  </div>
+                </article>
+              )}
+            </>
+          )}
+        </div>
+        {!draft && (
+          <div className="meal-composer">
+            {selectedFile && previewUrl && (
+              <div className="meal-composer__preview">
+                <img src={previewUrl} alt="Selected meal" />
+                <div><strong>{selectedFile.name}</strong><span>Ready to analyze</span></div>
+                <Button hasIconOnly kind="ghost" size="sm" iconDescription="Remove photo" renderIcon={TrashCan} onClick={() => { setSelectedFile(undefined); setPreviewUrl(undefined); }} />
+              </div>
             )}
+            <TextInput id="meal-note" labelText="Meal note" placeholder="Chicken bowl after the gym" value={note} onChange={(event) => setNote(event.target.value)} />
+            <div className="meal-composer__actions">
+              <FileUploaderButton
+                accept={["image/jpeg", "image/png", "image/webp", "image/heic"]}
+                buttonKind="ghost"
+                disableLabelChanges
+                labelText={<><Image size={16} aria-hidden="true" />Photo</>}
+                multiple={false}
+                onChange={(event) => choosePhoto(event.target.files?.[0])}
+              />
+              <Button renderIcon={Send} disabled={!selectedFile || submit.isPending} onClick={() => submit.mutate()}>{submit.isPending ? "Analyzing..." : "Analyze meal"}</Button>
+            </div>
+            <p className="meal-composer__disclosure">Your photo and note are sent to OpenAI for analysis.</p>
           </div>
         )}
         {error && <div className="inline-error" role="alert">{error}</div>}

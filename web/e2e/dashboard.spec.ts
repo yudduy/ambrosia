@@ -26,7 +26,28 @@ test("dashboard navigates every domain without horizontal overflow", async ({ pa
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("meal photo remains a draft until it is analyzed and confirmed", async ({ page }) => {
+test("meal photo is analyzed in one action and waits for confirmation", async ({ page }) => {
+  const thumbnail = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  const uploaded = {
+    id: "draft-1", created_at: "2026-08-30T20:00:00Z", expires_at: "2026-08-31T20:00:00Z",
+    status: "uploaded", note: "Chicken bowl after the gym", thumbnail_url: thumbnail, analysis: null,
+  };
+  const analyzed = {
+    ...uploaded,
+    status: "ready",
+    analysis: {
+      description: "Chicken rice bowl", meal_type: "meal",
+      calories: { low: 600, high: 750 }, protein_g: { low: 40, high: 55 },
+      carbs_g: { low: 65, high: 90 }, fat_g: { low: 14, high: 24 },
+      sodium_mg: { low: 700, high: 1100 }, ingredients: ["chicken", "rice", "vegetables"],
+      confidence: 0.76, uncertainty_note: "Portion size cannot be confirmed from the photo.",
+    },
+  };
+  await page.route("**/api/nutrition/uploads", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(uploaded) }));
+  await page.route("**/api/nutrition/drafts/draft-1/**", (route) => {
+    const body = route.request().url().endsWith("/analyze") ? analyzed : { ...analyzed, status: "confirmed" };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
   await page.goto("/nutrition");
   await page.locator('input[type="file"]').setInputFiles({
     name: "meal.png",
@@ -37,9 +58,10 @@ test("meal photo remains a draft until it is analyzed and confirmed", async ({ p
     ),
   });
   await expect(page.getByText("meal.png", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Add photo" }).click();
-  await expect(page.getByRole("heading", { name: "Ready to analyze" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Analyze", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Discard" }).click();
-  await expect(page.getByText("meal.png", { exact: true })).not.toBeVisible();
+  await page.getByLabel("Meal note").fill("Chicken bowl after the gym");
+  await page.getByRole("button", { name: "Analyze meal" }).click();
+  await expect(page.getByRole("heading", { name: "Estimate" })).toBeVisible();
+  await expect(page.locator('input[value="Chicken rice bowl"]')).toBeVisible();
+  await page.getByRole("button", { name: "Save meal" }).click();
+  await expect(page.getByRole("heading", { name: "Analyze a meal" })).toBeVisible();
 });
