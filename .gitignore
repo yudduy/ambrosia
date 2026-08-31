@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+web/node_modules/
+web/dist/
+sidecar/node_modules/
+playwright-report/
+test-results/
+*.duckdb
+*.parquet
