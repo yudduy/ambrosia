@@ -11,6 +11,7 @@ def test_launch_agent_is_loopback_only_and_keeps_secrets_out_of_arguments(app_se
     token = tmp_path / "token.json"
     payload = launch_agent_payload(app_settings, project, Path("/opt/homebrew/bin/uv"), credentials, token)
     arguments = payload["ProgramArguments"]
+    assert arguments[1:4] == ["run", "--frozen", "--project"]
     assert arguments[-4:] == ["--host", "127.0.0.1", "--port", "8787"]
     assert payload["Label"] == SERVICE_LABEL
     assert payload["KeepAlive"] == {"SuccessfulExit": False}

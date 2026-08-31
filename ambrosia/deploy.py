@@ -40,6 +40,7 @@ def launch_agent_payload(
         "ProgramArguments": [
             str(uv_path),
             "run",
+            "--frozen",
             "--project",
             str(project_root),
             "ambrosia",
